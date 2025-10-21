@@ -1,0 +1,171 @@
+核心功能
+
+目標、特徵、標註、模型、PR-AUC/Hit/Utility 指標：完整。
+
+門檻 τ、κ 與 U(t)=E[excess_return]/C(s,t)：正確。
+
+需補與風險（高→中）
+
+Ingestion 與 UI 分離
+
+Streamlit 不適合直接長連 WebSocket。改用後端 Ingest Worker（FastAPI/uvicorn）拉 Binance WS，寫入快取層（Redis/ClickHouse）。Streamlit 以 REST/SSE 輕量讀取。
+
+好處：穩定、可重放、可回測同源。
+
+時序與對齊
+
+強制三時間戳：exchange_time, ingest_time, infer_time。
+
+亂序/缺片處理：以深度序號 U/u、lastUpdateId 驗證順序；缺片打 quality_flag。
+
+校時偏差>100ms 標記 degraded，避免洩漏。
+
+成本函數 C(s,t) 可執行化
+
+明確 fee(maker/taker) + slippage(λ, near-touch depth, order_size) + funding_cost(H)。
+
+滑點以歷史成交回放做分位擬合（2.5/50/97.5%）。沒有這層，U 會偏高。
+
+回測撮合引擎
+
+事件驅動撮合：尊重限價/市價、排隊、延遲、部分成交、資金費結算。
+
+沒有撮合一致性，線下成績無法映射線上。
+
+Purged K-Fold + Embargo 落地
+
+你的介面寫了，但需強制在資料切分層實作，避免視窗穿越 t。
+
+校準（Platt/Isotonic）要用 OOF 分桶檢驗，避免過度自信機率。
+
+狀態管理
+
+Streamlit 端用 st.session_state 管 UI 狀態即可，但資料狀態放快取（Redis）和熱庫（ClickHouse）。
+
+重要：訊號冷卻與去重需在後端做，UI 只渲染結果。
+
+部署
+
+Railway：建立多進程或多服務
+
+ingest-worker（Binance WS）
+
+feature-worker（特徵與標註排程）
+
+infer-api（即時推論與U計算）
+
+streamlit-ui（只讀 API）
+
+可選：backtest-worker
+
+服務間以 Redis/HTTP 溝通，開 CORS。
+
+Binance API 細節
+
+只用 WS 即時，REST 僅做快照/補缺。
+
+分流訂閱：aggTrade, bookTicker, depth@100ms, kline@1m, funding, openInterest, liquidation。
+
+速率與重連腳本、指標監控（丟包率、延遲）。
+
+SHAP 成本
+
+實時計算 SHAP 成本高。線上僅展示「預先計算之特徵重要度」或取每筆 top-K 特徵值與 sign。完整 SHAP 留給離線診斷。
+
+安全與合規
+
+API 金鑰不進 Streamlit 環境；只在 ingest 服務端。
+
+加上速率限制與簽章，防止被外部濫用你的訊號端點。
+
+最小可行架構（MVP）
+
+後端
+
+Ingest：Binance WS → Redis（最新切片）＋ ClickHouse（歷史）
+
+Features：批次/微批每 1s 生成 QI、OFI、Δmp、Δf、rv 等
+
+Model：LightGBM（OOF 校準），ONNX 推論；/predict 回 p_up, E[ret], U
+
+Backtest：讀 ClickHouse，事件撮合，回傳曲線與 PR-AUC/Hit/Utility
+
+前端（Streamlit）
+
+Realtime：從 /now 拉當前特徵、p_up、U、等級A/B
+
+Controls：θ_up/θ_dn/H、τ/κ、冷卻、自動或手動
+
+Diagnostics：分桶校準、Top-K 命中、Utility 分佈、延遲直方圖
+
+Backtest：選區間與標的，顯示曲線與指標
+
+資料契約（對外訊號）
+
+Protobuf 事件：id, symbol, exchange_time, p_up, CI, Eret, U, decision, regime, features_top5, model_version, cooldown_until, sla_latency_ms
+
+JSONL 審計：加上 shap_summary, cost_breakdown, data_lineage, quality_flags
+
+核對清單（你可以逐條勾）
+
+資料面
+
+ 三時間戳與時序完整性檢查（U/u、lastUpdateId）
+
+ 缺片/延遲標記與降級策略
+
+ ClickHouse 表與 Redis key 命名規約（symbol+tf+ts）
+
+特徵與標註
+
+ QI、OFI、Δmp、depth_slope、near_touch_void、λ、Δf、ΔOI、rv_ratio、bb_squeeze_turn 的視窗與單位固定
+
+ Triple-barrier 與 peak_return、ttp 正確，Embargo=H
+
+模型與評估
+
+ LightGBM OOF 校準通過，分桶誤差 ≤ 5pp
+
+ HPO 以 J = α·PR-AUC + β·Hit@TopK + γ·Avg(U) − δ·FPR 最佳化
+
+ 回測撮合一致（限價/市價、延遲、資金費）
+
+線上
+
+ τ/κ 可即時調整並即時影響過濾
+
+ 訊號冷卻與去重在後端執行
+
+ 延遲監控與熔斷自動降級
+
+輸出
+
+ Protobuf 給機器人，JSONL 審計落地
+
+ 單位與版本策略清楚（向後相容）
+
+你現在的說明書 vs 需微調之處
+
+已涵蓋
+
+Binance WS、核心特徵、Triple-barrier、LightGBM、U 函數、τ/κ 控制、回測視覺化、Purged K-Fold/Embargo、SHAP、乾淨 UI。
+
+需微調
+
+將 WS 轉為「後端服務」再供 Streamlit 訂閱。
+
+明確成本模型擬合方法與參數來源。
+
+補上撮合引擎與資料品質旗標。
+
+SHAP 線上用精簡版，完整版離線算。
+
+增加 Redis/ClickHouse 作為快取/熱庫。
+
+風險邊界與保底策略
+
+資料抖動：自動切到「規則→Meta-Model」模式，只用 OFI、QI、Δmp。
+
+模型失準：分位校準曲線漂移>5pp，回退上一穩定版。
+
+吞吐壓力：降低特徵頻率或聚合，暫停重成本指標（Hawkes、全 SHAP）。

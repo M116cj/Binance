@@ -1,0 +1,143 @@
+A. 立即可用的硬參數表（上線預設）
+
+Ingestion
+
+symbols/conn=25；micro-batch=20ms（自調 10–25ms）；snapshot=15s；heartbeat=5s；reconnect=0.5→8s 指數退避；SLO：loss<1%，gap<0.2%，p95<300ms。
+
+時序與序列
+
+drift_alarm=100ms；gap_rebuild=0.2%/min；影子標記：degraded_time_sync、depth_gap。
+
+Redis
+
+batch=100；L1 TTL=200ms（BTC/ETH）；SETEX=3–10s；cost-lookup TTL=5–15m（key=regime:symbol:tf）。
+
+ClickHouse
+
+Engine=MergeTree；Codec=ZSTD(6)；Partition=toDate(ts)；Order=(symbol, ts)；batch_insert=10k；MV=1s/1m。
+
+特徵
+
+ring_len=max(H)+5%；昂貴特徵批次=1–5s；有效樣本<50%→NaN + window_insufficient。
+
+標註
+
+θ_up=0.6%，θ_dn=0.4%，H={5,10,30}m；Δcool=10–30m 自適應；embargo=H。
+
+成本
+
+MAPE 目標≤15%；滑點分位=2.5/50/97.5；O(1) 查表。
+
+模型
+
+LightGBM focal γ=1.5；|ρ|>0.9 剔除；Isotonic OOF 校準，ECE≤5pp；ONNX opset≥17，batch=32，OpenMP=實體核心；可選 float16。
+
+回測
+
+neutral=5 檔；conservative=1–2 檔 + p97.5 滑點；30d/1m <60s；影子單 KS p>0.05。
+
+/predict
+
+QPS≥300；p95≤50ms；timeout=200ms；batch 合併最大延遲=25ms；冷卻鎖= symbol+H。
+
+門檻
+
+A-tier：τ=0.75, κ=1.20；B-tier：τ=0.65, κ=1.00。
+
+B. 壓測與驗收矩陣（最少集）
+
+/predict 壓測
+
+批量 {1,8,32} × 併發 {64,128,256}；檢查 p95≤50ms、CPU 70–85%、GC 時間<5%。
+
+WS 重放
+
+10× 速率回放 1h；gap 重建準確≥99.5%；loss<1%。
+
+成本對帳
+
+實盤影子單 vs 估計成本：MAPE≤15%，分位誤差≤5pp。
+
+校準
+
+Reliability 10 分桶 ECE≤5pp；Brier 改善 vs 未校準。
+
+回測
+
+30d/1m 完成<60s；neutral 與 conservative 檢核差距合理（U 收斂）。
+
+C. 告警門檻（Prometheus 指標名）
+
+ws_packet_loss_ratio > 0.01 for 5m → WARN
+
+ws_depth_gap_ratio > 0.002 for 3m → SNAPSHOT_REBUILD
+
+ws_e2e_latency_ms_p95 > 300 for 10m → SCALE_OUT
+
+clock_drift_ms_ewma > 100 for 5m → SET degraded_time_sync
+
+feature_compute_ms_p95{name} > 5 或 feature_nan_rate{name} > 0.05 → 降頻該特徵
+
+predict_latency_ms_p95 > 50 for 10m 或 predict_qps_util > 0.8 → 增副本
+
+calibration_ece_pp > 5 → 觸發 Recalibration Job
+
+cost_mape_ratio > 0.15 → Refit 成本表
+
+rolling_pr_auc_7d_drop > 0.1 或 fpr_pp_increase > 10 for 30m → 自動回滾模型
+
+D. 自動降級與回滾策略（開關級別）
+
+背壓觸發
+
+queue_depth > high → 關閉昂貴特徵（Hawkes/全 SHAP），切 rule→meta-model（OFI+QI+Δmp），/predict 只放 A-tier。
+
+資料劣化
+
+degraded_time_sync 或 depth_gap 升高 → 臨時提升 τ/κ（+0.05/+0.1），解鎖後逐步還原。
+
+金絲雀
+
+新模型 5–10% 流量；任兩項核心指標惡化>10% 持續 30m → 自動回滾前版與門檻。
+
+E. 可觀測性與根因分析
+
+全鏈路 TraceID：WS→特徵→/predict→/reports；定位瓶頸（解壓/特徵/模型/成本）。
+
+質量面板：quality_flags 命中率、window_insufficient 分資產分布。
+
+校準面板：分桶偏差熱圖，門檻 τ 自動微調（偏差>5pp 時每次 0.01 步長）。
+
+F. 容量規劃與拓撲
+
+服務拆分：ingest、feature、infer、backtest、reports、ui；不要共機。
+
+機器建議：infer 2–4 vCPU × 2–3 副本；ingest/feature 分核心綁定；Redis/CH 獨立節點。
+
+擴展規則：predict_qps_util > 0.8 或 p95 > 50ms 任一成立 → 水平擴容 1 副本。
+
+G. 報表產出優化（實務）
+
+報表 1–3：SSE 差分，UI 每 250–1000ms 重繪；不跨進程計算。
+
+報表 4–5：快照＋ETag/TTL（60–300s），避免重算；點擊再生成。
+
+報表 6–7：批次 5–15m，優先在非尖峰時段；只傳摘要到 UI。
+
+H. 風險守則（高波/清算潮）
+
+切換「高波模式」：滑點使用 p97.5 分位；容量 capacity_pct 上限降 30–50%；只放行 A-tier。
+
+冷卻自適應：Δcool 隨 FPR 升高而線性增加；FPR 回落再縮短。
+
+I. 最小落地任務（本週）
+
+打通 成本查表 Redis（生成 regime 索引與 TTL）
+
+ONNX 批推論 合併（25ms）與 float16 評估
+
+物化視圖 建立 1s/1m 滾動聚合
+
+SSE 差分 串接報表 1–3
+
+上線 Prometheus/OTEL 指標與三條關鍵告警

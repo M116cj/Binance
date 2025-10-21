@@ -1,0 +1,107 @@
+1) 最高優先優化（熱路徑）
+
+WS 微批：預設 20ms；自動調整 10–25ms（以 p95 延遲閉環）。
+
+解析：orjson + bytes→dict 零拷貝；禁用多餘欄位；WS binary+permessage-deflate。
+
+特徵快取：每 symbol 環形緩衝長度＝max(H_win)+5%；Welford 線上統計；昂貴特徵改 1–5s 批次。
+
+成本查表：g(λ,depth,size) 量化表放 Redis，key=regime:symbol:tf，TTL 5–15m；/predict O(1) 查。
+
+推論：ONNX OpenMP intra_op=num_physical_cores；batch=32；可選 float16；/predict async 批合併。
+
+報表：1–3 走 SSE 差分；4–5 圖快照 ETag+TTL；6–7 定時計算。
+
+2) 落地參數（建議預設）
+
+連線：每線 20–30 symbols；快照間隔 15s；WS 心跳 5s；重連退避 0.5→8s。
+
+三時間戳：時鐘漂移告警閾值 100ms；序列缺片重建閾值 0.2%/min。
+
+Redis：熱鍵 L1 cache TTL 200ms；SETEX 3–10s；pipeline 批量 50–200。
+
+ClickHouse：MergeTree + ZSTD(6)；PARTITION BY toDate(ts)；ORDER BY (symbol, ts)；批插 10k 行；MV 1s/1m。
+
+特徵：<50% 有效樣本即 NaN + window_insufficient；Hawkes/全 SHAP 改離線。
+
+標註：θ_up=0.6%、θ_dn=0.4%、H={5,10,30}m；Δcool=10–30m 自適應。
+
+模型：focal γ=1.5；|ρ|>0.9 剔除；OOF Isotonic；ECE 目標 ≤5pp；ONNX opset≥17。
+
+回測：中性=5 檔；保守=1–2 檔 + p97.5 滑點；30 天 1m 目標 <60s。
+
+/predict：QPS≥300，p95 ≤50ms；超時 200ms；批合併最大延遲 25ms。
+
+通知：A 級 τ=0.75, κ=1.20；B 級 τ=0.65, κ=1.00；同 symbol+H 冷卻鎖。
+
+3) 監控指標與告警（Prometheus 命名示例）
+
+Ingestion
+
+ws_packet_loss_ratio{conn} > 0.01 連續 5m → WARN
+
+ws_depth_gap_ratio{symbol} > 0.002 連續 3m → REBUILD SNAPSHOT
+
+ws_e2e_latency_ms_p95 > 300ms 連續 10m → SCALE OUT
+
+時序
+
+clock_drift_ms_ewma > 100ms 連續 5m → DEGRADE FLAG
+
+特徵
+
+feature_compute_ms_p95{name} > 5ms 或 feature_nan_rate{name} > 0.05 → 降頻該特徵
+
+推論
+
+predict_latency_ms_p95 > 50ms 或 predict_qps 接近 80% 飽和 → 增副本
+
+策略/品質
+
+calibration_ece_pp > 5 → 觸發重校準任務
+
+cost_mape_ratio > 0.15 → 重新擬合成本表
+
+rolling_pr_auc_7d_drop > 0.1 或 fpr_pp_increase > 10 → 自動回滾模型
+
+4) 自動降級與回滾
+
+背壓：特徵佇列深度>閾值 → 關閉昂貴特徵，切「規則→Meta-Model」（OFI+QI+Δmp）。
+
+資料劣化：degraded_time_sync 或 depth_gap 升高 → 提高 τ/κ，只放行 A 級。
+
+金絲雀：新模型 5–10% 流量；若 PR-AUC↓>10% 或 FPR↑>10pp 持續 30m → 回滾上一版。
+
+5) 壓測與一致性驗證
+
+/predict 壓測：混合符號，批量 1/8/32；目標 p95 ≤50ms；CPU 利用率 70–85%。
+
+WS 回放：1 小時重放 10× 速率；缺片重建準確率 ≥99.5%。
+
+成本回放：預估 vs 實際成本 MAPE ≤15%，分位誤差 ≤5pp。
+
+影子單：KS 檢定 p>0.05；滑點分佈匹配。
+
+6) 容量與拓撲（Railway）
+
+服務切分：ingest、feature、infer、backtest、reports、ui。
+
+CPU 釘核：ingest/feature/infer 分配不同核心；避免與 UI 共機。
+
+機器規模：單 infer 實例 2–4 vCPU；高峰擴 2–3 副本；Redis/CH 使用獨立計算資源。
+
+7) 安全與穩定
+
+API 金鑰僅在 ingest 服務；其他服務走內網；/predict 加速率限制。
+
+資料契約：所有訊號輸出帶 model_version, feature_version, cost_model, data_window_id。
+
+健康探針：/health 回報 exchange_lag_s；>2s 暫停通知。
+
+8) 維運節律
+
+每日：校準分桶、ECE 漂移、自動 τ 微調。
+
+每週：成本表重擬合、PR-AUC/Hit@TopK 回顧、告警閾值再校正。
+
+每月：回測全量回放 + 模型蒸餾/量化評估。

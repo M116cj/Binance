@@ -1,0 +1,119 @@
+論
+設計正確。下列在你現有規格後，整合「最新報表套件（7 份）」進入 Streamlit 儀表與後端輸出。每份報表含用途、核心欄位、計算定義、決策解讀、建議圖表。可直接納入 /reports 產出與前端分頁。
+
+現有後端與前端規格（確認）
+
+WS Ingestion：多連線、每線≤20–30 symbols、心跳與自動重連、depth snapshot→delta 回放補序。
+
+三時間戳：exchange_time, ingest_time, infer_time；>100ms 漂移 → degraded_time_sync；U/u,lastUpdateId 跳號 → depth_gap。
+
+儲存：Redis（spot|perp:{symbol}:{stream}）、ClickHouse（symbol, ts, stream, timeframe）。
+
+特徵工程：嚴格 t-窗，輸出 window_start/window_end=t；樣本<50% 或深度不連續 → NaN + window_insufficient。
+
+核心特徵：QI、OFI、microprice deviation、depth slope、near-touch void、impact λ、funding Δ、OI pressure、rv 比、Bollinger squeeze。
+
+標註：Triple-barrier(θ_up,θ_dn,H)，Δcool∈[10–30m]，embargo=H，無重疊；回歸：peak_return, time_to_peak。
+
+成本模型 C(s,t)：費率 + 滑點 g(λ,depth,size)（2.5/50/97.5 分位）+ funding 成本；MAPE ≤15%，版本化。
+
+模型：LightGBM + focal(γ∈[1,2])，OFI/QI 單調約束，共線剔除(|ρ|>0.9)，OOF Platt/Isotonic 校準（Reliability/Brier/ECE≤5pp）。
+
+回測：事件撮合（限價排隊、部分成交、延遲注入、逐筆匹配、資金費結算），保守/中性兩模式；影子單 KS 檢定 p>0.05。
+
+推論：/predict 回 p_up+CI, E[excess_return], U；後端去重與冷卻（symbol+H 鎖至 cooldown_until），近鄰事件合併。
+
+前端：Streamlit（唯讀，REST/SSE 250–1000ms），即時訊號 A/B、τ/κ 控制、校準曲線、U 分佈、Hit@TopK、延遲直方、品質旗標板。
+
+報表套件（新增，納入「Reports」分頁與 /reports/* API）
+1) 即時訊號總覽（Realtime Signal Card）
+
+用途：判斷此刻是否具「上漲前徵兆」可交易。
+
+核心欄位：p_up(H=5/10/30m), CI, E[excess_return], C(s,t), U, decision∈{A,B,none}, regime, features_top5, cooldown_until, sla_latency_ms, quality_flags。
+
+計算：U=E/C；p_up 為 OOF 校準後；成本分解帶版本號 cost_model=vX.Y。
+
+解讀：p_up≥τ 且 U≥κ 觸發；A/B 兩級。
+
+圖表：p_up 儀表、U 儀表、Top-5 特徵條形、品質指示燈。
+
+2) 市場結構與流動性（Regime & Liquidity State）
+
+用途：界定市場狀態以動態調整門檻。
+
+核心欄位：rv_ratio=rv(1m)/rv(15m), depth_slope, near_touch_void, funding_delta, OI_pressure, arrival_rate；regime=(vol_bucket, depth_bucket, funding_bucket)。
+
+計算：rv = sqrt(Σ r_i^2)；depth_slope 為 log(sz) 對距離回歸斜率。
+
+解讀：高波未乾涸 → 降 τ；低波或流動性薄 → 升 τ。
+
+圖表：三分面熱力（波動/深度/資金費）、五檔厚度剖面。
+
+3) 前兆機率與時間窗（Pre-Surge Probability & Window）
+
+用途：何時、以多大幅度上漲的機率分佈。
+
+核心欄位：p_up(H 曲線), exp_excess_return(H), exp_time_to_peak(H), CI bands, τ/κ 畫線。
+
+計算：peak_return=max(mid_{t→t+H}/mid_t−1)；ttp = argmax−t。
+
+解讀：p_up(10m)>p_up(5m) 且 U 穩 → 取長窗策略。
+
+圖表：機率-視窗曲線、期望報酬與效用對比。
+
+4) 執行成本與容量（Execution Cost & Capacity）
+
+用途：避免 U 高估，給出可執行倉位。
+
+核心欄位：fees_maker/taker, slippage_p50/p975, funding_cost(H), λ, near_touch_liq, est_fill_rate, capacity_curve(size→U), capacity_pct。
+
+計算：滑點分位擬合 g(λ,depth,size)；capacity_pct = argmax_size U / cap_max。
+
+解讀：若 U(size) 隨倉位快速下滑 → 收斂下游下單量。
+
+圖表：U-size 曲線、成本瀑布、滑點箱形圖。
+
+5) 歷史回測績效（Backtest Performance）
+
+用途：量化可交易性與策略穩健度。
+
+核心欄位：PR-AUC, Hit@TopK/day, Avg(U), Sharpe_post_cost, MaxDD, FPR；收益曲線、月度柱狀、交易/停留時間分佈。
+
+定義：Sharpe_post_cost = mean(ret_net)/std(ret_net)（事件或日頻）。
+
+解讀：PR-AUC↑、Avg(U)>1、FPR 在目標內 → 可上線。
+
+圖表：PR 曲線、收益&回撤、命中熱力、U 分佈。
+
+6) 校準與誤差診斷（Calibration & Error Analysis）
+
+用途：機率可解釋，找出誤差來源。
+
+核心欄位：Reliability diagram、Brier、ECE、錯誤簇（FP/FN 時的 OFI, QI, Δmp, depth_slope, Δf, ΔOI 組合）。
+
+解讀：ECE>5pp → 重做校準或調整特徵/分桶。
+
+圖表：校準分桶、錯誤簇雷達、TopK 混淆矩陣。
+
+7) 事件歸因與策略對比（Attribution & Strategy Comparison）
+
+用途：收益由哪些前兆驅動；比較不同 H/τ/κ/容量限制。
+
+核心欄位：SHAP top10、規則→Meta 投票、策略 A/B 指標對比：PR-AUC, Hit@TopK, Avg(U), FPR, MaxDD。
+
+解讀：在容量與 FPR 約束下選 Avg(U) 最大的組合。
+
+圖表：SHAP 梯形圖、A/B 雷達、對比表。
+
+報表輸出與整合
+
+API：
+
+/reports/realtime, /reports/regime, /reports/window, /reports/cost, /reports/backtest, /reports/calibration, /reports/attribution
+
+皆帶 symbol, window, params(θ_up, θ_dn, H, τ, κ)。
+
+格式：JSON 主體 + 可選 PNG/HTML 圖；附 model_version, feature_version, data_window_id, cost_model。
+
+前端：Streamlit 分頁同名；即時層（1–3）每 250–1000ms 更新；決策層（4–5）按需；診斷層（6–7）批次生成。

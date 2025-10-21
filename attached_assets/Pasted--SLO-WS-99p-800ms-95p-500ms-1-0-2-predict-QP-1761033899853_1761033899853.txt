@@ -1,0 +1,174 @@
+目標 SLO（先訂數字）
+
+端到端訊號延遲（WS→特徵→推論→通知）：99p ≤ 800ms（目標），95p ≤ 500ms。
+
+丟包率：< 1%；序列缺片率：< 0.2%。
+
+/predict QPS：單實例 ≥ 300 rps（p95 ≤ 50ms）。
+
+回測 30 天、1 分鐘頻：< 60s 完成（保守撮合）。
+
+校準 ECE：≤ 5pp；成本模型 MAPE：≤ 15%。
+
+熱路徑加速（資料→特徵→推論）
+1) WebSocket Ingestion
+
+連線分區與針對性壓縮：按 symbol 池拆多線；啟用 binary frames + permessage-deflate；禁用不必要欄位。
+
+快照→增量回放：每 10–30s 自動快照；若偵測 U/u 跳號，只重放缺段，而非全量重建。
+
+零拷貝解壓與解析：用 orjson/rapidjson 解析；避免中途字串化。
+
+CPU 釘核：將 WS I/O 綁定到固定核心，減少 context switch。
+
+事件整形微批：以 10–25ms micro-batch 聚合同一 symbol 的多筆 trade/depth 事件，減少下游喚醒次數。
+
+2) Redis 快取
+
+管線與批量寫入：使用 pipeline/mget 批讀；寫入採 SETEX 一次性帶 TTL。
+
+鍵空間壓縮：symbol 映射為整數 ID，鍵長縮短 30%+。
+
+熱鍵保護：對超熱標的（BTC/ETH）設置 local L1 cache（進程內 100–300ms 的短暫快取）降低 Redis 壓力。
+
+3) ClickHouse 儲存
+
+表引擎與編碼：MergeTree/ReplacingMergeTree，CODEC(ZSTD(6))，對低基數欄位用 LowCardinality。
+
+分區與排序鍵：PARTITION BY toDate(ts)，ORDER BY (symbol, ts)；避免跨分區查詢。
+
+物化視圖：建立 1s/1m 滾動聚合視圖，供回放與報表直接查，不做即時計算。
+
+批量寫入：每批 5k–20k 行，避免碎片。
+
+字典映射：symbol→id 用 External Dictionary，JOIN 常數 O(1)。
+
+4) 特徵工程
+
+滑動視窗環形緩衝：每 symbol 維護 ring buffer，只更新新點，避免全窗重算（QI/OFI/Δmp/rv 等）。
+
+向量化與 JIT：numpy 向量化；對重計算（如 Hawkes λ、回歸斜率）用 numba(nopython)。
+
+增量統計：均值/方差/協方差採 Welford 線上公式；量化特徵 80% 可 O(1) 更新。
+
+機率昂貴特徵降頻：Hawkes、完整 SHAP 僅離線或每 1–5s 批次更新一次；線上用快近似（top-K 特徵值）。
+
+一致性標記：任何窗內有效樣本 <50% 或序列不連續 → 立刻 NaN + window_insufficient，避免污染下游。
+
+5) 推論與效用
+
+ONNX Runtime：啟用 OpenMP/num_threads=實體核心數；批量推論（同一 timestamp 的多 symbol 一起推）。
+
+模型量化：若可接受≤1pp PR-AUC 損失，做 float16/INT8 量化，推論延遲 -30%~60%。
+
+Treelite/LightGBM-native：GBDT 路徑可考慮 Treelite 編譯提升 1.5–3x。
+
+成本模型快取：g(λ, depth, size) 以 分位表 預計算並快取到 Redis（按 regime key），/predict O(1) 查表。
+
+去重與冷卻在後端：以 Bloom filter + TTL 快速檢查重複訊號；合併近鄰事件降低通知風暴。
+
+回測與報表加速
+6) 事件撮合引擎
+
+兩檔精度模式：中性模式用 5 檔簿，保守模式用 1–2 檔＋更嚴格滑點分位，切換即時。
+
+時間輪延遲注入：用 timing wheel 模擬下單與撮合延遲，計算量線性可控。
+
+向量化重放：對歷史 k line 回放用 列式批量步進，每步處理多標的多委託。
+
+並行切片：按日或按 symbol 分片，CPU 多進程平行；I/O 由 ClickHouse 批量拉取。
+
+7) 報表與 Streamlit
+
+SSE 增量更新：即時卡（報表 1–3）採 SSE 推送差分資料；避免主動輪詢。
+
+圖表快照：成本與回測（報表 4–5）生成 PNG/HTML 快照並加 ETag/TTL，UI 翻頁時直接回傳快照。
+
+診斷批次：校準與歸因（報表 6–7）按 5–15 分鐘 批次產生，避免線上阻塞。
+
+UI 限流與去抖：互動控制（τ、κ）變更 debounce 300ms，避免觸發風暴。
+
+可靠性與監控
+8) 可觀測性（Prometheus + OTEL）
+
+核心指標：
+
+Ingestion：WS 丟包率、深度缺片率、延遲 p50/p95/p99。
+
+特徵：每特徵計算耗時、NaN 比、window_insufficient 命中率。
+
+推論：/predict QPS、延遲分位、批量大小、模型版本。
+
+成本：估計 vs 實際 MAPE、分位誤差。
+
+策略：PR-AUC（滑動窗）、Hit@TopK、Avg(U)、FPR。
+
+校準監控：Reliability 分桶偏差，ECE 漂移>5pp 觸發自動回調 τ 或重新校準任務。
+
+追蹤：/predict、/reports 整鏈路 TraceID，定位慢點（解壓、特徵、模型、成本）。
+
+9) 背壓與熔斷
+
+隊列深度檢查：當 feature 或 infer 佇列超閾，自動降頻昂貴特徵，切到「規則→Meta-Model」。
+
+健康探針：/health 報出最新 exchange_time 與落後秒數；落後>2s 標紅並暫停通知。
+
+重試與汙點隔離：單一 symbol 連續錯誤→隔離到備用線並降低頻率。
+
+數據治理與一致性
+10) 時鐘與序列
+
+時鐘偏差 EWMA：以 EWMA 追蹤 exchange−ingest，偏差分位告警；>100ms 打 degraded_time_sync。
+
+序列對帳：每分鐘對 lastUpdateId 範圍稽核；缺片比>0.2% 觸發快照重建。
+
+11) 模型與版本治理
+
+輸出簽名：訊號 payload 帶 model_version, feature_version, cost_model, data_window_id。
+
+金絲雀發布：新模型僅 5–10% 流量；核心指標任兩項惡化超閾自動回滾。
+
+硬體與系統層
+12) 執行環境
+
+Python 事件循環：uvloop + httpx/uvicorn；FastAPI 啟 workers = 2×CPU。
+
+序列化：orjson 全面替換標準 json；傳輸使用 Protobuf/MessagePack。
+
+NUMA 規劃：高流量環境將 ingest/feature/infer 分布於不同 CPU 套接。
+
+容器限制：固定 ulimit、打開檔案數、TCP keepalive；禁用過度 GC，調整 GIL 衝突（計算放子進程）。
+
+資源配置優先序（最小投入→最大收益）
+
+WS 微批 + orjson（立即降延遲）
+
+特徵環形緩衝 + 線上統計（CPU 用量腰斬）
+
+成本模型查表化（U 計算 O(1)）
+
+ONNX 批推論 + 量化（/predict p95 大幅下降）
+
+ClickHouse 物化視圖（報表即時）
+
+Prometheus + 校準監控（避免性能退化與過度自信）
+
+影子單對齊 + KS 監控（撮合一致性長期穩定）
+
+風險控制與保底策略
+
+資料品質降級：旗標升高→提高 τ/κ，僅放行 A 級。
+
+高波與清算潮：臨時停用容量放大，改用保守成本分位（p97.5）。
+
+UI 壅塞：只推差分與快照；大圖批次產出，避免阻塞主線程。
+
+建議預設（可直接套用）
+
+Micro-batch：25ms；ONNX batch size：32；/predict timeout：200ms。
+
+冷卻：每 symbol+H 10–30m 自適應；A 級 τ/κ = 0.75/1.20，B 級 0.65/1.00。
+
+Redis TTL：熱快照 3–10s；報表快照 60–300s。
+
+ClickHouse：ZSTD(6)，Partition=day，物化 1s/1m 滾動匯總。

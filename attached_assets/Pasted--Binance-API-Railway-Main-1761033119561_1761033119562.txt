@@ -1,0 +1,544 @@
+目標
+以最優訓練流程產出「上漲前徵兆」模型，為其他機器人提供高精度、低虛警的價格/策略通知，最大化「每則通知的期望淨收益」。資料源用 Binance API，伺服器部署於 Railway。
+
+Main Solution
+1) 任務定義
+
+輸入（11 類）：交易所信息、訂單簿深度、最近成交、K 線、標記價與資金費率、Ticker 統計、持倉量、 多空比、指數/複合指數、強平訂單、主動買賣量。
+
+輸出：
+
+p↑(t,H)：未來 H∈{5m,10m,30m} 內上漲達 θ_up 的機率
+
+E[excess return] 與達成時間
+
+成本內化：手續費＋滑點＋資金費＋成交率＋容量折損 → 成本函數 C(s,t)
+
+決策分數：U(t)=E[excess return]/C(s,t)；通知觸發：p↑≥τ 且 U≥κ
+
+2) 標籤與樣本
+
+三重屏障：θ_up=0.3–1.0%，θ_dn=0.2–0.6%，H∈{5,10,30m}
+
+冷卻窗：Δcool=10–30m，同標的事件去重
+
+類別不平衡：事件比 1:5–1:20，focal loss γ=1–2 或 class-weight；加入「困難負樣本」
+
+洩漏防護：特徵僅用 t 可得資訊；視窗不跨越 t；Purged K-Fold(k=5, embargo=H)
+
+3) 特徵集（最小可行→擴充）
+
+訂單簿/流動性：QI_1..k、Δmp（microprice 偏離）、深度斜率、近價空窗量、衝擊係數 λ≈Δmid/ΔVol
+
+成交/主動量：OFI、短窗 CVD 斜率、買單簇強度（Hawkes λ_buy）、追單比
+
+波動/壓縮：實際波動率、RV 比 σ1/σ15、布林帶擠壓拐點
+
+衍生品：f、Δf（負值縮小）、ΔOI>0 的壓力累積、多空比與價格背離修復
+
+強平：清算密度、上方清算帶距離、清算後流動性回補時間
+
+跨所：領先—落後所價差變化、成交到達率上升
+
+正規化：分位數或 regime 分組 z-score；fractional differentiation 以近似平穩
+
+4) 模型與訓練配方
+
+階段 A（可解釋先行）：LightGBM（lr 0.02–0.05、max_depth 6–9、~2000 葉）＋對 OFI/QI 的單調約束
+
+階段 B（短序列一致性）：TCN/因果 Transformer，60–180 秒窗口校正 p↑
+
+多任務：分類 p↑、回歸（峰值幅度、達成時間）共用編碼
+
+成本感知損失：收益加權 BCE 或 focal＋Brier，目標最大化 E[U]
+
+校準：Platt 或 Isotonic，確保 p↑ 可比較
+
+不確定性：分位回歸或 MC-Dropout，輸出置信區間
+
+特徵約簡：SHAP 選前 30–60，去高共線與不穩定項
+
+5) Regime 與資料切片
+
+Regime 標籤：波動高/低、深度高/低、資金費負/中/正
+
+策略：門控或分模型；高波未乾涸降低 τ 提召回，低波提高 τ 抑誤報
+
+穿透泛化：跨交易所、現貨/合約、日/夜盤；domain-adversarial 或 sample reweight
+
+6) 超參與搜尋
+
+先粗網格 50–100 組，再貝葉斯 30–60 步
+
+目標函數（通知效用）：J = α·PR-AUC + β·Hit@TopK + γ·Avg(U) − δ·虛警率
+
+早停：校準後 PR 面積與 out-of-fold U 穩定性
+
+資料治理與對齊（Binance＋Railway 前提）
+7) 時序與對齊
+
+時間基準：serverTime；保存 exchange_time、ingest_time、infer_time
+
+校時：NTP/PTP，偏移>100ms 標示 degraded
+
+事件順序：trades→orderbook→funding/OI；亂序/缺片支援延遲重放與缺片標記
+
+視窗防洩漏：任何特徵窗口不得跨越 t；標籤 embargo=H
+
+8) Binance API 實務
+
+WebSocket 分流：aggTrade、bookTicker、depth@100ms、kline@1m、funding、openInterest、ticker、liquidation
+
+節流與重連：多連線分配 symbols，自動重訂閱；記錄 lastUpdateId 與深度序號 U/u 做缺片檢測
+
+壓縮：GZIP/Deflate；僅保留必要欄位入庫
+
+速率限制：REST 用於快照/補缺；即時以 WS 為主
+
+9) Railway 佈署與延遲預算
+
+進程：ingest worker（WS）、feature worker、infer API、backtest worker、metrics 分離
+
+SLA 延遲：資料→特徵→推論→通知 < 1000ms；目標 300/300/200/200ms
+
+熔斷：丟包率>1% 或延遲>2×均值 → 自動降級「規則→Meta-Model」並回報
+
+儲存：熱資料 ClickHouse、冷資料 MinIO；結果快取 TTL 3–10s
+
+通知與下游整合
+10) 觸發與營運規則
+
+產出欄位最小集：timestamp, symbol, p↑, E[return], U, H, θ_up, regime, features_top5
+
+分級：A 級（U≥κ_hi 且 p↑≥τ_hi）、B 級（U≥κ_mid 且 p↑≥τ_mid）
+
+去重/抑制：同標的冷卻 Δcool；相近訊號合併
+
+頻率上限：每資產每日 ≤3–5 則；regime 自適應冷卻
+
+容量：每資產維護 U–size 曲線；通知附建議容量百分比與是否飽和
+
+11) 輸出標準（傳輸＋落地）
+
+傳輸層：Protobuf 或 MessagePack（類型安全、低延遲）給其他機器人
+
+落地層：JSON Lines（完整審計與解釋）
+
+必備欄位：
+
+id、symbol、exchange_time、ingest_time、infer_time、horizon、θ_up/θ_dn
+
+p_up、p_ci_low/p_ci_high、exp_excess_return、exp_time_to_peak
+
+cost_model、est_cost、utility_U、decision（含 τ、κ）
+
+regime、capacity_pct、entry_hint、exit_policy
+
+features_top5、shap_summary（落地層必留）、rule_votes（若有）
+
+model_version／feature_version／data_version、data_lineage、quality_flags、cooldown_until、sla_latency_ms、signature（可選）
+
+單位與版本：百分比用小數；時間用秒；金額用標的報價貨幣；新增欄位向後相容
+
+Alternatives
+
+規則→Meta-Model：5–8 條高精度微結構規則產生候選，模型二次過濾，降虛警降成本
+
+離線 RL（CQL）：只學「觸發後加減倉」微決策，疊加分類模型
+
+危險率模型：預測在 H 內上破的到達率，強化時間敏感通知
+
+Additional Perspectives
+
+成本與容量曲線先行，上線限額避免回測外推
+
+交叉驗證透明化：每折曲線、分位回報、誤報分解可追溯
+
+模型蒸餾：將序列大模型蒸餾到小 GBDT/小 Transformer，便於端側推論
+
+災難保護：資料缺口、時鐘漂移、深度異常 → 自動升高 τ/κ 或降級規則版
+
+Testing or Validation
+
+驗證：Walk-forward（週/月度）＋ Purged K-Fold（k=5, embargo=H）
+
+線下指標：PR-AUC、Hit@TopK（每日前 K 則）、Avg(U)、成本後 Sharpe、最大連虧、虛警率
+
+線上指標：分位校準曲線、A/B 對比、延遲直方圖、觸發分佈、規則/模型分岐
+
+穿透：跨所、日/夜盤、不同波動 regime；時間扭曲與價格微擾；撮合一致性
+
+上線灰度：影子通知→小流量→全量；任兩項核心指標惡化超閾即回滾
+
+事後解析：SHAP 排名、錯誤簇（假牆撤單、到達率下降、資金費突變）
+
+References
+
+López de Prado（三重屏障、驗證）
+Bacry 等（Hawkes/事件簇）
+Bouchaud/Cont（微結構與衝擊）
+
+以最優訓練流程產出「上漲前徵兆」模型，輸出價格/策略通知，最大化每則通知的期望淨收益。
+核心決策：U(t)=E[excess_return]/C(s,t)；觸發條件：p_up(t,H)≥τ 且 U(t)≥κ。
+
+0. 共同規格（全部函數共用）
+
+記號：mid_t=(best_bid_t+best_ask_t)/2；Δx=x_t−x_{t-1}；S[t−W:t] 表示長度 W 的後視窗。
+
+視窗對齊：所有特徵僅使用 ≤ t 的資料；任何均值與回歸均限定在 [t−W, t]，不可越界。
+
+標準化：除另註外，採「分位數標準化」或「regime 分組 z-score」。
+
+缺值：若視窗內有效樣本<50% 或深度序列不連續（根據 U/u 與 lastUpdateId），回傳 NaN 並設 quality_flag=degraded。
+
+單位：價格以標的報價貨幣；比率為小數；時間為秒；量為合約張數或幣數，需在入口統一。
+
+1. 標籤生成（Labeling）
+1.1 triple_barrier
+
+定義：label_triple_barrier(t; θ_up, θ_dn, H)
+
+輸入：mid_t；未來區間 [t, t+H] 的最高/最低中價 max_mid, min_mid
+
+輸出：y ∈ {+1, 0, -1} 或二元 y_up ∈ {0,1}（預設二元上漲事件）
+
+公式：
+
+若 max_mid/mid_t − 1 ≥ θ_up 且在此之前 min_mid/mid_t − 1 > −θ_dn，則 y_up=1；
+
+反之 y_up=0。
+
+備註：同一資產相鄰事件需間隔 Δcool∈[10m,30m]。Embargo 對後續樣本施加 H 冷卻以防洩漏。
+
+1.2 peak_return_and_ttp
+
+定義：peak_return_and_ttp(t; H)
+
+輸入：未來 [t, t+H] 的 mid 序列
+
+輸出：r_peak = max(mid_{τ}/mid_t − 1)，ttp = argmax(mid_{τ})−t
+
+用途：回歸頭（峰值幅度、達峰時間）。
+
+2. 訂單簿/流動性特徵（Order Book & Liquidity）
+2.1 queue_imbalance
+
+定義：QI_k(t; levels=1..k)
+
+輸入：最佳 k 檔的 (bid_px_i, bid_sz_i, ask_px_i, ask_sz_i)
+
+輸出：QI_k ∈ [−1,1]
+
+公式：QI_k = (Σ_{i=1..k} bid_sz_i − Σ_{i=1..k} ask_sz_i) / (Σ_{i=1..k} bid_sz_i + Σ_{i=1..k} ask_sz_i)
+
+視窗/標準化：直接時點值；可再對 S[t−W:t] z-score。
+
+註釋：反映近價排隊不平衡；對上漲前徵兆，QI_k↑ 常伴隨。
+
+2.2 microprice_deviation
+
+定義：microprice_dev(t)
+
+輸入：best_bid_t, best_ask_t, bid_sz_1, ask_sz_1
+
+輸出：Δmp = (micro_t − mid_t) / mid_t
+
+公式：micro_t = (best_ask_t*bid_sz_1 + best_bid_t*ask_sz_1) / (bid_sz_1 + ask_sz_1)
+
+註釋：隊列權重的「即時公平價」偏離；Δmp>0 指買方優勢。
+
+2.3 depth_slope
+
+定義：depth_slope(t; k)
+
+輸入：前 k 檔每檔 (px_i, sz_i) 的對數價差 Δp_i=|px_i−mid_t|/mid_t 與 sz_i
+
+輸出：回歸斜率 β_depth
+
+公式：最小平方法對 (Δp_i, log(sz_i)) 擬合，輸出斜率
+
+註釋：量對距離的衰減；斜率更負＝近價更厚。
+
+2.4 near_touch_void
+
+定義：near_touch_void(t; r_bps)
+
+輸入：距 mid_t ±r_bps 基點的累積掛單量
+
+輸出：void_ratio = 1 − (liq_within_r / liq_total_k)
+
+註釋：近價空窗；上破前若上方空窗偏大，易加速。
+
+2.5 impact_lambda
+
+定義：impact_lambda(t; W)
+
+輸入：視窗 W 內成交流 Vol 與中價變動 Δmid
+
+輸出：λ ≈ |Δmid| / (Vol + ε)（或以對數回歸 |ΔP| = Λ * Vol^ψ 估參）
+
+註釋：單位成交的價格衝擊；λ↓ 代表以較小量即可推動價格上行。
+
+3. 成交/主動量特徵（Trades & Order Flow）
+3.1 order_flow_imbalance
+
+定義：OFI(t; W)
+
+輸入：W 內逐筆，按 aggressor（買/賣）聚合
+
+輸出：OFI = (BuyVol − SellVol) / (BuyVol + SellVol)
+
+註釋：主動買賣不平衡；上漲前常見 OFI↑。
+
+3.2 cumulative_volume_delta_slope
+
+定義：CVD_slope(t; W)
+
+輸入：累積 CVD 時序
+
+輸出：β_cvd（線性回歸斜率或 EMA 斜率）
+
+註釋：買方動能傾向；斜率上升＝追價擴散。
+
+3.3 buy_cluster_hawkes
+
+定義：buy_cluster_hawkes(t; W)
+
+輸入：W 內買單到達時間點集
+
+輸出：λ_buy(t)（自激過程強度估計）
+
+模型：λ(t)=μ + Σ α exp(−β (t−t_i))；以 MLE 估 μ,α,β
+
+註釋：買單簇化；λ_buy↑ & λ_sell↓ 為前兆。
+
+3.4 follow_buy_ratio
+
+定義：follow_buy_ratio(t; W, Δ)
+
+輸入：大單（size>分位 q）後 Δ 秒內跟隨小單比例
+
+輸出：比例 r_follow
+
+註釋：追單效應量化；大單引導成功時 r_follow 提升。
+
+4. 波動/壓縮特徵（Volatility & Compression）
+4.1 realized_volatility
+
+定義：rv(t; W)
+
+輸入：視窗內對數報酬 r_i=log(mid_i/mid_{i-1})
+
+輸出：rv = sqrt(Σ r_i^2)（或年化）
+
+註釋：即時波動；與容量/成本模型聯動。
+
+4.2 rv_ratio
+
+定義：rv_ratio(t; W_short, W_long)
+
+輸出：ρ = rv(W_short)/rv(W_long)
+
+註釋：短長比；由低轉高的拐點常伴上破。
+
+4.3 bollinger_squeeze_turn
+
+定義：bb_squeeze_turn(t; W, k)
+
+輸入：移動平均 MA_W 與標準差 σ_W
+
+輸出：S = σ_W / (k * σ_long) 的下降→回升轉折指標
+
+註釋：帶寬擠壓後的擴張起點。
+
+5. 衍生品與定位（Funding, OI, Long/Short）
+5.1 funding_level_change
+
+定義：funding_delta(t; W)
+
+輸入：資金費 f_t
+
+輸出：Δf = f_t − EMA_W(f)；另計 sign_flip = 1[f_{t−1}<0 & f_t≈0]
+
+註釋：負值縮小/轉中性＋不跌為偏多前兆。
+
+5.2 open_interest_pressure
+
+定義：oi_pressure(t; W)
+
+輸入：OI_t
+
+輸出：ΔOI = OI_t − OI_{t−1}，以及 z_OI = zscore(OI over W)
+
+註釋：ΔOI>0 且價平盤，上破時易釋放。
+
+5.3 long_short_divergence_repair
+
+定義：lsr_repair(t; W)
+
+輸入：多空比 LSR_t = Long/Short 與價格
+
+輸出：div = zscore(LSR_t, W) − zscore(price_t, W)；repair = −Δ div
+
+註釋：背離收斂方向作為前兆。
+
+6. 清算與風險供給（Liquidations）
+6.1 liquidation_density
+
+定義：liq_density(t; band_bps)
+
+輸入：附近價帶內的多/空清算訂單量
+
+輸出：dens_up, dens_down（上/下方密度）
+
+註釋：上方稀疏＋下方剛清過，常見上行空窗。
+
+6.2 post_liq_liquidity_gap
+
+定義：post_liq_gap(t; Δ)
+
+輸入：清算事件後 Δ 秒內的訂單簿厚度變化
+
+輸出：gap = 1 − (liq_after / liq_before)
+
+註釋：掃單後供給回補慢＝易延續。
+
+7. 跨交易所/到達率（Cross-Exchange & Arrival）
+7.1 lead_lag_spread
+
+定義：lead_lag_spread(t; exA, exB, W)
+
+輸入：兩交易所中價
+
+輸出：Δmid = mid_exA − mid_exB 的一階差與方向持續時間
+
+註釋：領先所同步上行、落後所跟隨＝確認信號。
+
+7.2 trade_arrival_rate
+
+定義：arrival_rate(t; W)
+
+輸出：λ_arr = count(trades in W)/W，及 Δλ_arr = λ_arr − EMA_W(λ_arr)
+
+註釋：到達率回升＋OFI 同向＝觸發加分。
+
+8. 正規化與記憶（Stationarity）
+8.1 frac_diff
+
+定義：frac_diff(x_t; d∈(0,1))
+
+公式：x_t^{(d)} = Σ_{k=0..∞} w_k x_{t−k}，w_k = (−1)^k * C(d,k)
+
+輸出：保留長記憶且近似平穩的序列
+
+註釋：用於價格/特徵預處理；邊界以有效長度截斷。
+
+9. 成本、容量與效用（Cost & Capacity）
+9.1 cost_function
+
+定義：C(s,t) = fee(s) + slippage(s,depth_t) + funding_cost(H) + borrow_or_frictions
+
+fee(s)= maker_fee*|s_passive| + taker_fee*|s_aggr|
+
+slippage ≈ f(λ_t, order_size, near_touch_liquidity)（以 2.5/97.5 分位的歷史滑點擬合）
+
+備註：容量上限由「容量曲線」決定（見 9.3）。
+
+9.2 expected_excess_return
+
+定義：E[excess_return](t; H) = E[r_{t→t+H} − r_bench]
+
+r_bench 為持有成本或市場基準；估計方式採分位回歸或貝氏平均。
+
+9.3 capacity_curve
+
+定義：capacity_curve(symbol) → {size → U(size)}
+
+輸入：不同下單量的真實或擬合 U
+
+輸出：建議容量比例 capacity_pct = argmax_size U / cap_max
+
+註釋：通知時必回傳 capacity_pct。
+
+10. 模型輸出與校準（Prediction & Calibration）
+10.1 p_up_head
+
+定義：p_up(t,H)
+
+輸出：p_up∈[0,1]（LightGBM→Platt/Isotonic 校準；再由 TCN/因果Transformer 做一致性校正）
+
+註釋：只報「校準後」機率；保存 p_ci_low/p_ci_high。
+
+10.2 regression_heads
+
+定義：peak_amp(t,H), ttp(t,H)
+
+備註：多任務共享編碼；不確定性用分位回歸 q∈{0.1,0.5,0.9}。
+
+10.3 utility_score
+
+定義：U(t) = E[excess_return]/C(s,t)；通知門檻 τ, κ
+
+輸出：decision ∈ {A,B,none}；A：p_up≥τ_hi 且 U≥κ_hi；B：p_up≥τ_mid 且 U≥κ_mid。
+
+11. Regime 標籤（門控/分模型）
+11.1 regime_tags
+
+定義：regime(t) = (vol_bucket, depth_bucket, funding_bucket)
+
+vol_bucket = bucket(rv_ratio)；depth_bucket = bucket(depth_slope, near_touch_void)；funding_bucket = {neg, neutral, pos}
+
+用途：高波未乾涸→降低 τ；低波→提高 τ；或分模型訓練。
+
+12. 特徵選擇與穩健性
+12.1 shap_select
+
+定義：shap_select(features; K)
+
+輸出：前 K∈[30,60] 個穩健特徵，移除共線（|ρ|>0.9）與不穩定（跨折方差大）項。
+
+備註：每輪重訓重計。
+
+13. 超參與搜尋與停機（HPO & Early Stop）
+13.1 hpo_objective
+
+定義：J = α·PR-AUC + β·Hit@TopK + γ·Avg(U) − δ·FPR
+
+流程：粗網格 50–100 組→貝葉斯 30–60 步；以 OOF 校準後指標決策。
+
+早停：OOF J 無提升 N 步且校準曲線劣化>5pp 即止。
+
+14. 通知 Payload（對外 Protobuf；對內 JSONL）
+14.1 signal_payload
+
+必備欄位：
+id, symbol, exchange_time, ingest_time, infer_time, horizon, theta_up, theta_dn, p_up, p_ci_low, p_ci_high, exp_excess_return, exp_time_to_peak, cost_model, est_cost, utility_U, decision, regime, capacity_pct, entry_hint, exit_policy, features_top5[{name,value}], shap_summary(optional for wire, required for audit), rule_votes, model_version, feature_version, data_version, data_lineage, quality_flags, cooldown_until, sla_latency_ms, signature(optional)
+
+備註：百分比小數，時間秒，金額以報價貨幣；新增欄位需向後相容。
+
+15. 驗證與上線
+15.1 CV 與防洩漏
+
+Purged K-Fold(k=5, embargo=H) + walk-forward(週/月)；只用 ≤t 特徵。
+
+15.2 線下/線上指標
+
+線下：PR-AUC, Hit@TopK, Avg(U), Sharpe_post_cost, MaxDD, FPR
+
+線上：校準分桶、A/B、延遲分佈、觸發分佈、規則/模型分岐、容量利用。
+
+15.3 灰度與回滾
+
+影子→小流量→全量；任兩項核心指標惡化超閾即回滾上一穩定版。
+
+16. Binance & Railway 運營要點（簡述）
+
+WS 分流：aggTrade, bookTicker, depth@100ms, kline@1m, funding, openInterest, ticker, liquidation；符號切分多連線。
+
+序列完整：以 lastUpdateId、U/u 檢測缺片；缺片標示並觸發補缺。
+
+延遲預算：資料→特徵→推論→通知 < 1000 ms；各段約 300/300/200/200 ms。
+
+熔斷：丟包>1% 或延遲>2×均值→切換「規則→Meta-Model」降級。
+
+儲存：熱 ClickHouse、冷 MinIO；結果快取 TTL 3–10 s。
