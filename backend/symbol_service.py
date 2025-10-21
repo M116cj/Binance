@@ -75,61 +75,46 @@ class BinanceSymbolService:
     def _get_chinese_name(self, base_asset: str) -> str:
         """获取币种的中文名称"""
         name_map = {
-            'BTC': '比特币',
-            'ETH': '以太坊',
-            'BNB': '币安币',
-            'SOL': '索拉纳',
-            'XRP': '瑞波币',
-            'ADA': '艾达币',
-            'DOGE': '狗狗币',
-            'MATIC': '马蹄币',
-            'DOT': '波卡币',
-            'AVAX': '雪崩币',
-            'SHIB': '柴犬币',
-            'LTC': '莱特币',
-            'LINK': '链克币',
-            'UNI': '优尼币',
-            'ATOM': '宇宙币',
-            'ETC': '以太经典',
-            'XLM': '恒星币',
-            'BCH': '比特现金',
-            'NEAR': '近距币',
-            'APT': 'Aptos',
-            'ARB': 'Arbitrum',
-            'OP': 'Optimism',
-            'TRX': '波场币',
-            'FIL': '文件币',
-            'ALGO': '阿尔戈',
-            'VET': '唯链',
-            'ICP': '互联网计算机',
-            'SAND': '沙盒',
-            'MANA': '去中心地',
-            'AXS': 'Axie',
-            'THETA': '西塔',
-            'FTM': '幻影',
-            'EGLD': 'Elrond',
-            'XTZ': 'Tezos',
-            'AAVE': 'Aave',
-            'GRT': '图谱',
-            'EOS': '柚子币',
-            'CAKE': '煎饼',
-            'MKR': 'Maker',
-            'STX': 'Stacks',
-            'INJ': 'Injective',
-            'PEPE': '佩佩蛙',
+            'BTC': '比特币', 'ETH': '以太坊', 'BNB': '币安币', 'SOL': '索拉纳', 'XRP': '瑞波币',
+            'ADA': '艾达币', 'DOGE': '狗狗币', 'MATIC': '马蹄币', 'DOT': '波卡币', 'AVAX': '雪崩币',
+            'SHIB': '柴犬币', 'LTC': '莱特币', 'LINK': '链克币', 'UNI': '优尼币', 'ATOM': '宇宙币',
+            'ETC': '以太经典', 'XLM': '恒星币', 'BCH': '比特现金', 'NEAR': '近距币', 'APT': 'Aptos',
+            'ARB': 'Arbitrum', 'OP': 'Optimism', 'TRX': '波场币', 'FIL': '文件币', 'ALGO': '阿尔戈',
+            'VET': '唯链', 'ICP': '互联网计算机', 'SAND': '沙盒', 'MANA': '去中心地', 'AXS': 'Axie',
+            'THETA': '西塔', 'FTM': '幻影', 'EGLD': 'Elrond', 'XTZ': 'Tezos', 'AAVE': 'Aave',
+            'GRT': '图谱', 'EOS': '柚子币', 'CAKE': '煎饼', 'MKR': 'Maker', 'STX': 'Stacks',
+            'INJ': 'Injective', 'PEPE': '佩佩蛙', 'WLD': 'Worldcoin', 'TIA': 'Celestia', 
+            'SUI': 'Sui', 'SEI': 'Sei', 'JUP': 'Jupiter', 'WIF': 'dogwifhat', 'PYTH': 'Pyth',
+            'STRK': 'Starknet', 'BONK': 'Bonk', 'RNDR': 'Render', 'IMX': 'Immutable', 
+            'RUNE': 'THORChain', 'FET': 'Fetch.ai', 'GALA': 'Gala', 'CHZ': 'Chiliz',
+            'ENJ': 'Enjin', 'LDO': 'Lido', 'CRV': 'Curve'
         }
         return name_map.get(base_asset, base_asset)
     
     def _get_fallback_symbols(self) -> List[Dict[str, str]]:
         """返回备用的交易对列表（当API调用失败时）"""
-        logger.warning("使用备用交易对列表")
-        fallback = [
-            {'symbol': 'BTCUSDT', 'baseAsset': 'BTC', 'name': '比特币', 'displayName': '比特币 (BTC)'},
-            {'symbol': 'ETHUSDT', 'baseAsset': 'ETH', 'name': '以太坊', 'displayName': '以太坊 (ETH)'},
-            {'symbol': 'BNBUSDT', 'baseAsset': 'BNB', 'name': '币安币', 'displayName': '币安币 (BNB)'},
-            {'symbol': 'SOLUSDT', 'baseAsset': 'SOL', 'name': '索拉纳', 'displayName': '索拉纳 (SOL)'},
-            {'symbol': 'XRPUSDT', 'baseAsset': 'XRP', 'name': '瑞波币', 'displayName': '瑞波币 (XRP)'},
+        logger.warning("使用预设交易对列表（包含主流币种）")
+        
+        base_assets = [
+            'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE', 'MATIC', 'DOT', 'AVAX',
+            'SHIB', 'LTC', 'LINK', 'UNI', 'ATOM', 'ETC', 'XLM', 'BCH', 'NEAR', 'APT',
+            'ARB', 'OP', 'TRX', 'FIL', 'ALGO', 'VET', 'ICP', 'SAND', 'MANA', 'AXS',
+            'THETA', 'FTM', 'EGLD', 'XTZ', 'AAVE', 'GRT', 'EOS', 'CAKE', 'MKR', 'STX',
+            'INJ', 'PEPE', 'WLD', 'TIA', 'SUI', 'SEI', 'JUP', 'WIF', 'PYTH', 'STRK',
+            'BONK', 'RNDR', 'IMX', 'RUNE', 'FET', 'GALA', 'CHZ', 'ENJ', 'LDO', 'CRV'
         ]
+        
+        fallback = []
+        for base in base_assets:
+            symbol = f"{base}USDT"
+            name = self._get_chinese_name(base)
+            fallback.append({
+                'symbol': symbol,
+                'baseAsset': base,
+                'name': name,
+                'displayName': f"{name} ({base})"
+            })
+        
         return fallback
 
 symbol_service = BinanceSymbolService()
