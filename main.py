@@ -21,6 +21,7 @@ from frontend.components.calibration_analysis import CalibrationAnalysis
 from frontend.components.attribution_comparison import AttributionComparison
 from frontend.components.admin_panel import AdminPanel
 from frontend.components.signal_history import SignalHistory
+from frontend.components.monitoring_dashboard import MonitoringDashboard
 
 # Configuration
 BACKEND_HOST = os.getenv("BACKEND_HOST", "localhost")
@@ -39,6 +40,7 @@ class CryptoSurgePredictionDashboard:
         self.attribution_comparison = AttributionComparison()
         self.admin_panel = AdminPanel()
         self.signal_history = SignalHistory()
+        self.monitoring_dashboard = MonitoringDashboard()
         
     def initialize_session_state(self):
         """Initialize Streamlit session state variables"""
@@ -291,6 +293,13 @@ class CryptoSurgePredictionDashboard:
         # We need to fetch data based on filters, so we'll pass the fetch function
         self.signal_history.render(self.fetch_data)
     
+    def render_monitoring_dashboard(self):
+        """Monitoring dashboard with SLA and quality metrics"""
+        st.markdown("## 📊 System Monitoring")
+        
+        # Pass fetch function to monitoring dashboard
+        self.monitoring_dashboard.render(self.fetch_data)
+    
     def run(self):
         """Main application runner"""
         st.set_page_config(
@@ -319,6 +328,7 @@ class CryptoSurgePredictionDashboard:
             "🎯 Calibration Analysis",
             "🔍 Attribution & Comparison",
             "📜 Signal History",
+            "📊 Monitoring",
             "⚙️ Admin Panel"
         ])
         
@@ -347,6 +357,9 @@ class CryptoSurgePredictionDashboard:
             self.render_signal_history()
         
         with tabs[8]:
+            self.render_monitoring_dashboard()
+        
+        with tabs[9]:
             self.render_admin_panel()
 
 def main():
