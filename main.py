@@ -11,7 +11,7 @@ import json
 import os
 from typing import Dict, List, Any, Optional
 
-# Import frontend components
+# 导入前端组件
 from frontend.components.signal_card import SignalCard
 from frontend.components.regime_state import RegimeState
 from frontend.components.probability_window import ProbabilityWindow
@@ -23,7 +23,7 @@ from frontend.components.admin_panel import AdminPanel
 from frontend.components.signal_history import SignalHistory
 from frontend.components.monitoring_dashboard import MonitoringDashboard
 
-# Configuration
+# 配置
 BACKEND_HOST = os.getenv("BACKEND_HOST", "localhost")
 BACKEND_PORT = os.getenv("BACKEND_PORT", "8000")
 BASE_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
@@ -43,7 +43,7 @@ class CryptoSurgePredictionDashboard:
         self.monitoring_dashboard = MonitoringDashboard()
         
     def initialize_session_state(self):
-        """Initialize Streamlit session state variables"""
+        """初始化Streamlit会话状态变量"""
         if 'selected_symbol' not in st.session_state:
             st.session_state.selected_symbol = 'BTCUSDT'
         if 'theta_up' not in st.session_state:
@@ -62,7 +62,7 @@ class CryptoSurgePredictionDashboard:
             st.session_state.last_update = time.time()
             
     def fetch_data(self, endpoint: str, params: Dict = None) -> Optional[Dict]:
-        """Fetch data from backend API with error handling"""
+        """从后端API获取数据，带错误处理"""
         try:
             response = self.client.get(f"{BASE_URL}/{endpoint}", params=params or {})
             response.raise_for_status()
@@ -78,11 +78,11 @@ class CryptoSurgePredictionDashboard:
             return None
     
     def render_sidebar(self):
-        """Render the control sidebar"""
+        """渲染控制侧边栏"""
         st.sidebar.title("🔥 Crypto Surge Prediction")
         st.sidebar.markdown("---")
         
-        # Symbol selection
+        # 交易对选择
         symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'DOTUSDT', 'LINKUSDT']
         st.session_state.selected_symbol = st.sidebar.selectbox(
             "Trading Pair", 
@@ -92,7 +92,7 @@ class CryptoSurgePredictionDashboard:
         
         st.sidebar.markdown("### 📊 Parameters")
         
-        # Labeling parameters
+        # 标记参数
         st.session_state.theta_up = st.sidebar.number_input(
             "θ_up (Up Threshold %)", 
             min_value=0.1, 
@@ -111,7 +111,7 @@ class CryptoSurgePredictionDashboard:
             format="%.1f"
         ) / 100
         
-        # Decision thresholds
+        # 决策阈值
         st.sidebar.markdown("### ⚡ Decision Thresholds")
         
         tier = st.sidebar.radio("Signal Tier", ["A-tier", "B-tier", "Custom"])
@@ -122,7 +122,7 @@ class CryptoSurgePredictionDashboard:
         elif tier == "B-tier":
             st.session_state.tau_threshold = 0.65
             st.session_state.kappa_threshold = 1.00
-        else:  # Custom
+        else:  # 自定义
             st.session_state.tau_threshold = st.sidebar.slider(
                 "τ (Probability Threshold)", 
                 0.5, 0.95, st.session_state.tau_threshold, 0.01
@@ -132,21 +132,21 @@ class CryptoSurgePredictionDashboard:
                 0.8, 2.0, st.session_state.kappa_threshold, 0.05
             )
         
-        # Display current thresholds
+        # 显示当前阈值
         st.sidebar.info(f"τ = {st.session_state.tau_threshold:.2f}")
         st.sidebar.info(f"κ = {st.session_state.kappa_threshold:.2f}")
         
-        # Auto-refresh
+        # 自动刷新
         st.session_state.auto_mode = st.sidebar.checkbox("Auto Refresh", st.session_state.auto_mode)
         
         if st.sidebar.button("🔄 Manual Refresh"):
             st.session_state.last_update = time.time()
             st.rerun()
             
-        # System status
+        # 系统状态
         st.sidebar.markdown("### 🟢 System Status")
         
-        # Health check
+        # 健康检查
         health_data = self.fetch_data("health")
         if health_data:
             if health_data.get("status") == "healthy":
@@ -163,7 +163,7 @@ class CryptoSurgePredictionDashboard:
             st.sidebar.error("❌ Backend Unavailable")
     
     def render_realtime_signal_card(self):
-        """Report 1: Realtime Signal Card"""
+        """报告1：实时信号卡片"""
         st.markdown("## 📡 Real-time Signal Overview")
         
         params = {
@@ -181,7 +181,7 @@ class CryptoSurgePredictionDashboard:
             st.error("Unable to load real-time signal data")
     
     def render_regime_state(self):
-        """Report 2: Market Regime & Liquidity State"""
+        """报告2：市场状态与流动性"""
         st.markdown("## 🌊 Market Regime & Liquidity State")
         
         params = {'symbol': st.session_state.selected_symbol}
@@ -192,7 +192,7 @@ class CryptoSurgePredictionDashboard:
             st.error("Unable to load regime state data")
     
     def render_probability_window(self):
-        """Report 3: Pre-Surge Probability & Window"""
+        """报告3：预测概率与时间窗口"""
         st.markdown("## 📈 Pre-Surge Probability & Time Window")
         
         params = {
@@ -208,7 +208,7 @@ class CryptoSurgePredictionDashboard:
             st.error("Unable to load probability window data")
     
     def render_cost_capacity(self):
-        """Report 4: Execution Cost & Capacity"""
+        """报告4：执行成本与容量"""
         st.markdown("## 💰 Execution Cost & Capacity Analysis")
         
         params = {'symbol': st.session_state.selected_symbol}
@@ -219,7 +219,7 @@ class CryptoSurgePredictionDashboard:
             st.error("Unable to load cost & capacity data")
     
     def render_backtest_performance(self):
-        """Report 5: Historical Backtest Performance"""
+        """报告5：历史回测性能"""
         st.markdown("## 📊 Historical Backtest Performance")
         
         params = {
@@ -238,7 +238,7 @@ class CryptoSurgePredictionDashboard:
             st.error("Unable to load backtest performance data")
     
     def render_calibration_analysis(self):
-        """Report 6: Calibration & Error Analysis"""
+        """报告6：校准与误差分析"""
         st.markdown("## 🎯 Model Calibration & Error Analysis")
         
         params = {
@@ -254,7 +254,7 @@ class CryptoSurgePredictionDashboard:
             st.error("Unable to load calibration analysis data")
     
     def render_attribution_comparison(self):
-        """Report 7: Event Attribution & Strategy Comparison"""
+        """报告7：事件归因与策略对比"""
         st.markdown("## 🔍 Event Attribution & Strategy Comparison")
         
         params = {
@@ -272,36 +272,36 @@ class CryptoSurgePredictionDashboard:
             st.error("Unable to load attribution comparison data")
     
     def render_admin_panel(self):
-        """Admin panel for model management and system configuration"""
+        """管理面板：模型管理和系统配置"""
         st.markdown("## ⚙️ Admin Panel & System Configuration")
         
-        # Fetch models data
+        # 获取模型数据
         models_data = self.fetch_data("models")
         
-        # Fetch signal statistics
+        # 获取信号统计数据
         signals_stats = self.fetch_data("signals/stats")
         
-        # Render admin panel
+        # 渲染管理面板
         self.admin_panel.render(models_data, signals_stats)
     
     def render_signal_history(self):
-        """Signal history view with past predictions"""
+        """信号历史视图：显示过往预测"""
         st.markdown("## 📜 Signal History")
         
-        # Get filter values from the component
-        # These will be set by the component's render method
-        # We need to fetch data based on filters, so we'll pass the fetch function
+        # 从组件获取过滤值
+        # 这些值将由组件的render方法设置
+        # 我们需要根据过滤器获取数据，所以传递fetch函数
         self.signal_history.render(self.fetch_data)
     
     def render_monitoring_dashboard(self):
-        """Monitoring dashboard with SLA and quality metrics"""
+        """监控仪表板：SLA和质量指标"""
         st.markdown("## 📊 System Monitoring")
         
-        # Pass fetch function to monitoring dashboard
+        # 将fetch函数传递给监控仪表板
         self.monitoring_dashboard.render(self.fetch_data)
     
     def run(self):
-        """Main application runner"""
+        """主应用程序运行器"""
         st.set_page_config(
             page_title="Crypto Surge Prediction System",
             page_icon="🚀",
@@ -312,13 +312,13 @@ class CryptoSurgePredictionDashboard:
         self.initialize_session_state()
         self.render_sidebar()
         
-        # Auto-refresh logic
+        # 自动刷新逻辑
         if st.session_state.auto_mode:
-            if time.time() - st.session_state.last_update > 1.0:  # 1 second refresh
+            if time.time() - st.session_state.last_update > 1.0:  # 1秒刷新
                 st.session_state.last_update = time.time()
                 st.rerun()
         
-        # Main content tabs
+        # 主内容标签页
         tabs = st.tabs([
             "📡 Real-time Signal", 
             "🌊 Market Regime", 
