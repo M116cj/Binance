@@ -60,6 +60,8 @@ class CryptoSurgePredictionDashboard:
             st.session_state.auto_mode = True
         if 'last_update' not in st.session_state:
             st.session_state.last_update = time.time()
+        if 'available_symbols' not in st.session_state:
+            st.session_state.available_symbols = None
             
     def fetch_data(self, endpoint: str, params: Dict = None) -> Optional[Dict]:
         """从后端API获取数据，带错误处理"""
@@ -77,31 +79,62 @@ class CryptoSurgePredictionDashboard:
             st.error(f"Unexpected error: {str(e)}")
             return None
     
+    def load_available_symbols(self) -> List[Dict]:
+        """从后端加载所有可用的交易对"""
+        if st.session_state.available_symbols is not None:
+            return st.session_state.available_symbols
+        
+        try:
+            data = self.fetch_data("symbols")
+            if data and 'symbols' in data:
+                st.session_state.available_symbols = data['symbols']
+                return data['symbols']
+        except Exception as e:
+            st.warning(f"无法加载交易对列表: {e}")
+        
+        fallback = [
+            {'symbol': 'BTCUSDT', 'baseAsset': 'BTC', 'name': '比特币', 'displayName': '比特币 (BTC)'},
+            {'symbol': 'ETHUSDT', 'baseAsset': 'ETH', 'name': '以太坊', 'displayName': '以太坊 (ETH)'},
+            {'symbol': 'BNBUSDT', 'baseAsset': 'BNB', 'name': '币安币', 'displayName': '币安币 (BNB)'},
+        ]
+        st.session_state.available_symbols = fallback
+        return fallback
+    
     def render_sidebar(self):
         """渲染控制侧边栏"""
         st.sidebar.title("🚀 加密货币涨跌预测系统")
         st.sidebar.markdown("实时监控币价，智能预测涨跌")
         st.sidebar.markdown("---")
         
-        # 交易对选择
-        symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'DOTUSDT', 'LINKUSDT']
-        symbol_names = {
-            'BTCUSDT': '比特币 (BTC)',
-            'ETHUSDT': '以太坊 (ETH)',
-            'BNBUSDT': '币安币 (BNB)',
-            'ADAUSDT': '艾达币 (ADA)',
-            'DOTUSDT': '波卡 (DOT)',
-            'LINKUSDT': '链链 (LINK)'
-        }
+        # 交易对选择 - 从后端动态加载
+        available_symbols = self.load_available_symbols()
         
-        selected_display = st.sidebar.selectbox(
-            "📊 选择交易对", 
-            [symbol_names[s] for s in symbols],
-            index=[symbol_names[s] for s in symbols].index(symbol_names[st.session_state.selected_symbol])
+        if not available_symbols:
+            st.sidebar.error("⚠️ 无法加载交易对列表")
+            return
+        
+        symbol_options = [s['displayName'] for s in available_symbols]
+        symbol_map = {s['displayName']: s['symbol'] for s in available_symbols}
+        
+        current_symbol = st.session_state.selected_symbol
+        current_display = next(
+            (s['displayName'] for s in available_symbols if s['symbol'] == current_symbol),
+            available_symbols[0]['displayName']
         )
         
-        # 反向查找符号
-        st.session_state.selected_symbol = [s for s, n in symbol_names.items() if n == selected_display][0]
+        try:
+            default_index = symbol_options.index(current_display)
+        except ValueError:
+            default_index = 0
+        
+        selected_display = st.sidebar.selectbox(
+            "📊 选择交易对",
+            symbol_options,
+            index=default_index,
+            help=f"从币安{len(available_symbols)}个USDT交易对中选择"
+        )
+        
+        st.session_state.selected_symbol = symbol_map[selected_display]
         
         st.sidebar.markdown("### ⚙️ 交易参数设置")
         st.sidebar.caption("设置涨跌幅度的判断标准")

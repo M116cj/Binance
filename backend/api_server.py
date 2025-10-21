@@ -16,6 +16,7 @@ import uvicorn
 
 from backend.database import db_manager, get_db, ModelVersion, Signal, Prediction
 from backend.export_utils import signals_to_protobuf_batch, signals_to_jsonl
+from backend.symbol_service import symbol_service
 from fastapi.responses import Response
 
 logging.basicConfig(level=logging.INFO)
@@ -620,6 +621,20 @@ async def get_model_versions(
             }
             for m in models
         ]
+    }
+
+@app.get("/symbols")
+async def get_symbols():
+    """获取所有可用的币安USDT交易对
+    
+    返回:
+        交易对列表，每个包含symbol、baseAsset、name和displayName
+    """
+    symbols = await symbol_service.get_usdt_symbols()
+    return {
+        "symbols": symbols,
+        "count": len(symbols),
+        "updated_at": datetime.utcnow().isoformat()
     }
 
 @app.get("/export/protobuf")
