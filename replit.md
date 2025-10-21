@@ -6,6 +6,23 @@ This project is a cryptocurrency surge prediction system designed to forecast sh
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### 2025-10-21: Multi-Symbol Support & Complete Chinese Localization
+1. **Multi-Symbol Feature**:
+   - Added `BinanceSymbolService` to dynamically fetch all USDT trading pairs from Binance API
+   - Implemented `/symbols` REST endpoint in FastAPI backend
+   - Extended frontend to load and display 60+ mainstream cryptocurrencies
+   - Includes comprehensive Chinese naming for all major tokens (BTC, ETH, SOL, DOGE, etc.)
+   - Note: Due to Binance API restrictions (HTTP 451) in Replit environment, system uses curated preset list
+
+2. **Complete UI Chinese Localization**:
+   - All 7 dashboard components fully translated: Signal Card, Regime State, Probability Window, Cost Analysis, Backtest Performance, Calibration Analysis, Attribution
+   - Simplified technical jargon to everyday language (e.g., "Triple Barrier" → "上涨/下跌判定线")
+   - Added emoji indicators and color coding for better visual comprehension
+   - Strategy tiers renamed: 🛡️ Conservative (保守型), ⚖️ Balanced (平衡型), 🔥 Aggressive (激进型)
+   - All metrics, labels, and help text converted to Chinese
+
 ## System Architecture
 
 ### UI/UX Decisions
