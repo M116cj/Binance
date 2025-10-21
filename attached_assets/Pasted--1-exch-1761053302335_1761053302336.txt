@@ -1,0 +1,70 @@
+目標
+
+把研究型原型提升為可回放、可部署、可監控的「線上推論 + 迭代訓練」體系，降低訊號漂移、過擬合與執行落差。
+
+主方案
+	1.	資料與標註治理（最高優先）
+
+	•	事件級對齊：同時保存 exchange_ts / ingest_ts / infer_ts，用 EWMA 對時；產生 delay_ms 作為訓練特徵與回測延遲注入。
+	•	嚴格「標註切線」：以 t_now+Δ 的中位價或 VWAP 當目標，Δ 用多層（250ms、1s、5s）。訓練時禁止使用 t_now 之後任何欄位的資訊。
+	•	交易成本內生化：標註即扣除手續費與沖擊成本（以當下 L2 深度模擬滑點）。
+	•	走樣檢測：以「行情狀態標籤」（趨勢/盤整/高波動）分層統計，任何層的 label shift>10% 觸發重訓。
+
+	2.	模型結構
+
+	•	短線訊號主幹：因果一維 Dilated-CNN 或輕量因果 Transformer（attention 長度 256–1024 ticks，分多視窗支路 50ms/250ms/1s 後在 head 融合）。
+	•	雙頭解耦：分類頭預測方向 p_\uparrow，回歸頭預估條件報酬 E[R|trade]。用 Kelly-縮放或分段 Sizer：size = clip(fn(p, E[R], risk_cap))。
+	•	正則與穩定化：LayerNorm + Dropout 0.05–0.15，Weight Decay 1e-5，Label Smoothing 0.02，Mixup/Temporal Cutout（遮擋 10–30 連續 ticks）。
+	•	損失：分類採 FocalLoss(γ=1.5–2.0)，回歸採 Huber(δ=0.5×目標σ) + 成本超額罰則；加入「不交易」類作三分類以抑制噪聲進場。
+	•	不確定性：MC-Dropout 或 Deep Ensembles(K=3–5) 輸出信心區間，低信心時自動降倉或不下單。
+
+	3.	特徵工程
+
+	•	微結構：OB imbalance、queue imbalance、top-of-book churn、cancel/new ratio、trade sign、短窗 RV、到 VWAP 偏離、微觀動量（rank-norm）。
+	•	制度/衍生：資金費率、清算熱點密度（若永續）、事件旗標（開盤/收盤/大額爆量）。
+	•	標準化：以滾動中位數與 MAD，或 rank-norm；禁止跨樣本泄漏的全域標準化。
+
+	4.	訓練流程
+
+	•	Walk-Forward：連續切片 Train[k] -> Val[k] -> Test[k]，僅向前移動；每個切片輸出一組指標與模型快照。
+	•	HPO：用 Optuna 掃 LR(1e-4~3e-4)、dropout、內部維度(64–256)、卷積擴張率或注意力頭數；早停 5–10 eval。
+	•	資料加權：以 regime-aware reweighting，讓高波動區段占比不超過 40%。
+	•	再訓練門檻：當線上 KS-test 對特徵分佈 p<0.01 或 月度信息比率下降>30% 時觸發。
+
+	5.	線上推論與執行
+
+	•	推論 SLA：p95<3ms/批；批內延遲抖動納入 sizing。
+	•	交易路由：若延遲>閾值或 L2 深度不足，改走「被動單/不下單」策略。
+	•	風控：最大連虧 N、回撤閾值止損、尖峰波動自動半倉；倉位與風控決策均以模型信心調制。
+
+	6.	回測與真實度強化
+
+	•	事件驅動撮合器：價量優先，含被動成交、滑點、撤單失敗率。
+	•	延遲注入：把 infer_latency、order_latency 從線上監控抽樣注入回測。
+	•	報表：分 regime、分時段、分符號產出 IR、Hit-rate、AvgR、MaxDD、Turnover、Cost%，以及 反事後 的「可實做率」。
+
+架構優化
+	•	資料面：WebSocket 多路聚合 + 20ms 微批；Redis 熱快取（200ms TTL 熱幣種）；ClickHouse MergeTree（PARTITION BY toDate(ts), ORDER BY(symbol, ts)）+ 1s/1m 物化視圖；Parquet 分區供離線訓練。
+	•	應用面：backend 提供已聚合特徵與信號給 frontend；config/{dev,prod}.yaml 管理所有超參；模型與特徵 schema 以版本號與 SHA 追蹤；main.py 僅作入口與 DI。檔名與結構可在倉庫清單確認。 ￼
+	•	可觀測：Prometheus 指標集：ingest_lag_ms、ws_gap_ratio、feature_shift_ks、infer_p95_ms、trade_fill_ratio、pnl, max_dd；Grafana 呈現。
+
+立即可做的模型優化清單（按優先）
+	1.	改用 walk-forward + regime 分層評估，取代隨機切分。
+	2.	標註含成本與延遲，並加入「不交易」類別。
+	3.	引入 雙頭模型 + 信心調倉。
+	4.	HPO + 早停 + 混合精度，固定 seed 與完整 run 追蹤。
+	5.	線上 drift 監控與自動再訓練門檻。
+
+替代方案
+	•	樸素強基線：中位數回歸 + 邊界帶，多數情境下能給強健保底；用來對照深度模型是否真有超額。
+	•	Ensemble：三模型平均或 stacking（CNN/GRU/Transformer）。
+	•	策略層分離：先做方向分類 + 觸發規則，將 sizing 規則化管理，降低 overfit。
+
+其他視角
+	•	合規與金鑰：.env 載入，避免硬編；研究與實盤分離。
+	•	再現性：pyproject.toml、uv.lock 鎖版本；模型與特徵檔案帶 SHA 與 MODEL_PARAMETERS.md 索引。檔案名在倉庫可見。 ￼
+
+測試／驗證
+	•	離線：一天全量重播，丟包<1%，ingest_lag_ms p95<300；回測與線上 1:1 參數，PNL 漂移<0.5%。
+	•	線上：A/B 比較現模與新模，等額風險，至少 2 週；以 Sharpe、Hit-rate、Tail-loss、成本比為主指標。
+	•	統計：分 regime 檢定收益是否顯著；用 SPA/Reality Check 測試多策略挑選偏誤。
