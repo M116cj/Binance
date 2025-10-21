@@ -79,92 +79,120 @@ class CryptoSurgePredictionDashboard:
     
     def render_sidebar(self):
         """渲染控制侧边栏"""
-        st.sidebar.title("🔥 Crypto Surge Prediction")
+        st.sidebar.title("🚀 加密货币涨跌预测系统")
+        st.sidebar.markdown("实时监控币价，智能预测涨跌")
         st.sidebar.markdown("---")
         
         # 交易对选择
         symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'DOTUSDT', 'LINKUSDT']
-        st.session_state.selected_symbol = st.sidebar.selectbox(
-            "Trading Pair", 
-            symbols, 
-            index=symbols.index(st.session_state.selected_symbol)
+        symbol_names = {
+            'BTCUSDT': '比特币 (BTC)',
+            'ETHUSDT': '以太坊 (ETH)',
+            'BNBUSDT': '币安币 (BNB)',
+            'ADAUSDT': '艾达币 (ADA)',
+            'DOTUSDT': '波卡 (DOT)',
+            'LINKUSDT': '链链 (LINK)'
+        }
+        
+        selected_display = st.sidebar.selectbox(
+            "📊 选择交易对", 
+            [symbol_names[s] for s in symbols],
+            index=[symbol_names[s] for s in symbols].index(symbol_names[st.session_state.selected_symbol])
         )
         
-        st.sidebar.markdown("### 📊 Parameters")
+        # 反向查找符号
+        st.session_state.selected_symbol = [s for s, n in symbol_names.items() if n == selected_display][0]
+        
+        st.sidebar.markdown("### ⚙️ 交易参数设置")
+        st.sidebar.caption("设置涨跌幅度的判断标准")
         
         # 标记参数
         st.session_state.theta_up = st.sidebar.number_input(
-            "θ_up (Up Threshold %)", 
+            "📈 上涨判定线 (%)", 
             min_value=0.1, 
             max_value=2.0, 
             value=st.session_state.theta_up * 100,
             step=0.1,
-            format="%.1f"
+            format="%.1f",
+            help="价格上涨多少才算是\"涨\"？例如：0.6% 表示价格上涨0.6%以上才算真正上涨"
         ) / 100
         
         st.session_state.theta_dn = st.sidebar.number_input(
-            "θ_dn (Down Threshold %)", 
+            "📉 下跌判定线 (%)", 
             min_value=0.1, 
             max_value=1.5, 
             value=st.session_state.theta_dn * 100,
             step=0.1,
-            format="%.1f"
+            format="%.1f",
+            help="价格下跌多少才算是\"跌\"？例如：0.4% 表示价格下跌0.4%以上才算真正下跌"
         ) / 100
         
         # 决策阈值
-        st.sidebar.markdown("### ⚡ Decision Thresholds")
+        st.sidebar.markdown("### 🎯 交易策略选择")
+        st.sidebar.caption("选择你的风险偏好")
         
-        tier = st.sidebar.radio("Signal Tier", ["A-tier", "B-tier", "Custom"])
+        tier = st.sidebar.radio(
+            "策略类型", 
+            ["🛡️ 保守型", "⚖️ 平衡型", "🔥 激进型"],
+            help="保守型：高确定性但机会少 | 平衡型：兼顾收益和风险 | 激进型：更多机会但风险大"
+        )
         
-        if tier == "A-tier":
+        if tier == "🛡️ 保守型":
             st.session_state.tau_threshold = 0.75
             st.session_state.kappa_threshold = 1.20
-        elif tier == "B-tier":
+            st.sidebar.info("📊 保守策略：只在高把握时交易，安全第一")
+        elif tier == "⚖️ 平衡型":
             st.session_state.tau_threshold = 0.65
             st.session_state.kappa_threshold = 1.00
-        else:  # 自定义
-            st.session_state.tau_threshold = st.sidebar.slider(
-                "τ (Probability Threshold)", 
-                0.5, 0.95, st.session_state.tau_threshold, 0.01
-            )
-            st.session_state.kappa_threshold = st.sidebar.slider(
-                "κ (Utility Threshold)", 
-                0.8, 2.0, st.session_state.kappa_threshold, 0.05
-            )
+            st.sidebar.info("📊 平衡策略：追求收益与风险的平衡")
+        else:  # 激进型
+            st.session_state.tau_threshold = 0.55
+            st.session_state.kappa_threshold = 0.80
+            st.sidebar.warning("📊 激进策略：更多交易机会，但风险较高")
         
-        # 显示当前阈值
-        st.sidebar.info(f"τ = {st.session_state.tau_threshold:.2f}")
-        st.sidebar.info(f"κ = {st.session_state.kappa_threshold:.2f}")
+        # 显示当前阈值（用简单语言）
+        confidence_pct = int(st.session_state.tau_threshold * 100)
+        st.sidebar.metric("信心度要求", f"{confidence_pct}%", 
+                         help="只有当系统有这么高的把握时才会给出信号")
+        st.sidebar.metric("收益要求", f"{st.session_state.kappa_threshold:.1f}倍成本",
+                         help="预期收益至少要是交易成本的这么多倍")
         
         # 自动刷新
-        st.session_state.auto_mode = st.sidebar.checkbox("Auto Refresh", st.session_state.auto_mode)
+        st.sidebar.markdown("---")
+        st.session_state.auto_mode = st.sidebar.checkbox(
+            "🔄 自动刷新数据", 
+            st.session_state.auto_mode,
+            help="开启后每秒自动更新数据"
+        )
         
-        if st.sidebar.button("🔄 Manual Refresh"):
+        if st.sidebar.button("🔄 立即刷新", use_container_width=True):
             st.session_state.last_update = time.time()
             st.rerun()
             
         # 系统状态
-        st.sidebar.markdown("### 🟢 System Status")
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 💡 系统状态")
         
         # 健康检查
         health_data = self.fetch_data("health")
         if health_data:
             if health_data.get("status") == "healthy":
-                st.sidebar.success("✅ All Services Online")
+                st.sidebar.success("✅ 系统运行正常")
             else:
-                st.sidebar.warning("⚠️ Degraded Performance")
+                st.sidebar.warning("⚠️ 系统性能下降")
                 
             exchange_lag = health_data.get("exchange_lag_s", 0)
             if exchange_lag < 2:
-                st.sidebar.info(f"📡 Lag: {exchange_lag:.1f}s")
+                st.sidebar.info(f"📡 数据延迟：{exchange_lag:.1f}秒")
             else:
-                st.sidebar.error(f"📡 High Lag: {exchange_lag:.1f}s")
+                st.sidebar.error(f"📡 数据延迟较高：{exchange_lag:.1f}秒")
         else:
-            st.sidebar.error("❌ Backend Unavailable")
+            st.sidebar.error("❌ 后台服务未连接")
     
     def render_realtime_signal_card(self):
         """报告1：实时信号卡片"""
-        st.markdown("## 📡 Real-time Signal Overview")
+        st.markdown("## 📡 实时交易信号")
+        st.caption("当前最新的买卖建议和市场数据")
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -178,22 +206,24 @@ class CryptoSurgePredictionDashboard:
         if data:
             self.signal_card.render(data)
         else:
-            st.error("Unable to load real-time signal data")
+            st.error("❌ 无法加载实时信号数据，请检查后台服务")
     
     def render_regime_state(self):
         """报告2：市场状态与流动性"""
-        st.markdown("## 🌊 Market Regime & Liquidity State")
+        st.markdown("## 🌊 市场状态分析")
+        st.caption("当前市场的波动性和交易活跃度")
         
         params = {'symbol': st.session_state.selected_symbol}
         data = self.fetch_data("reports/regime", params)
         if data:
             self.regime_state.render(data)
         else:
-            st.error("Unable to load regime state data")
+            st.error("❌ 无法加载市场状态数据")
     
     def render_probability_window(self):
         """报告3：预测概率与时间窗口"""
-        st.markdown("## 📈 Pre-Surge Probability & Time Window")
+        st.markdown("## 📈 涨跌概率分析")
+        st.caption("未来不同时间段的价格上涨可能性")
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -205,22 +235,24 @@ class CryptoSurgePredictionDashboard:
         if data:
             self.probability_window.render(data, st.session_state.tau_threshold, st.session_state.kappa_threshold)
         else:
-            st.error("Unable to load probability window data")
+            st.error("❌ 无法加载概率分析数据")
     
     def render_cost_capacity(self):
         """报告4：执行成本与容量"""
-        st.markdown("## 💰 Execution Cost & Capacity Analysis")
+        st.markdown("## 💰 交易成本分析")
+        st.caption("不同交易金额的手续费和滑点成本")
         
         params = {'symbol': st.session_state.selected_symbol}
         data = self.fetch_data("reports/cost", params)
         if data:
             self.cost_capacity.render(data)
         else:
-            st.error("Unable to load cost & capacity data")
+            st.error("❌ 无法加载成本分析数据")
     
     def render_backtest_performance(self):
         """报告5：历史回测性能"""
-        st.markdown("## 📊 Historical Backtest Performance")
+        st.markdown("## 📊 历史表现回顾")
+        st.caption("过去30天的策略收益和胜率统计")
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -235,11 +267,12 @@ class CryptoSurgePredictionDashboard:
         if data:
             self.backtest_performance.render(data)
         else:
-            st.error("Unable to load backtest performance data")
+            st.error("❌ 无法加载历史表现数据")
     
     def render_calibration_analysis(self):
         """报告6：校准与误差分析"""
-        st.markdown("## 🎯 Model Calibration & Error Analysis")
+        st.markdown("## 🎯 预测准确度分析")
+        st.caption("系统预测的可靠性和准确性评估")
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -251,11 +284,12 @@ class CryptoSurgePredictionDashboard:
         if data:
             self.calibration_analysis.render(data)
         else:
-            st.error("Unable to load calibration analysis data")
+            st.error("❌ 无法加载准确度分析数据")
     
     def render_attribution_comparison(self):
         """报告7：事件归因与策略对比"""
-        st.markdown("## 🔍 Event Attribution & Strategy Comparison")
+        st.markdown("## 🔍 影响因素分析")
+        st.caption("哪些市场指标对预测影响最大")
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -269,11 +303,12 @@ class CryptoSurgePredictionDashboard:
         if data:
             self.attribution_comparison.render(data)
         else:
-            st.error("Unable to load attribution comparison data")
+            st.error("❌ 无法加载影响因素数据")
     
     def render_admin_panel(self):
         """管理面板：模型管理和系统配置"""
-        st.markdown("## ⚙️ Admin Panel & System Configuration")
+        st.markdown("## ⚙️ 系统管理")
+        st.caption("模型版本管理和参数配置")
         
         # 获取模型数据
         models_data = self.fetch_data("models")
@@ -286,7 +321,8 @@ class CryptoSurgePredictionDashboard:
     
     def render_signal_history(self):
         """信号历史视图：显示过往预测"""
-        st.markdown("## 📜 Signal History")
+        st.markdown("## 📜 历史信号记录")
+        st.caption("查看过往所有的交易信号和结果")
         
         # 从组件获取过滤值
         # 这些值将由组件的render方法设置
@@ -295,7 +331,8 @@ class CryptoSurgePredictionDashboard:
     
     def render_monitoring_dashboard(self):
         """监控仪表板：SLA和质量指标"""
-        st.markdown("## 📊 System Monitoring")
+        st.markdown("## 📊 系统监控")
+        st.caption("实时监控系统性能和数据质量")
         
         # 将fetch函数传递给监控仪表板
         self.monitoring_dashboard.render(self.fetch_data)
@@ -303,7 +340,7 @@ class CryptoSurgePredictionDashboard:
     def run(self):
         """主应用程序运行器"""
         st.set_page_config(
-            page_title="Crypto Surge Prediction System",
+            page_title="加密货币涨跌预测系统",
             page_icon="🚀",
             layout="wide",
             initial_sidebar_state="expanded"
@@ -320,16 +357,16 @@ class CryptoSurgePredictionDashboard:
         
         # 主内容标签页
         tabs = st.tabs([
-            "📡 Real-time Signal", 
-            "🌊 Market Regime", 
-            "📈 Probability Window",
-            "💰 Cost & Capacity",
-            "📊 Backtest Performance",
-            "🎯 Calibration Analysis",
-            "🔍 Attribution & Comparison",
-            "📜 Signal History",
-            "📊 Monitoring",
-            "⚙️ Admin Panel"
+            "📡 实时信号", 
+            "🌊 市场状态", 
+            "📈 概率分析",
+            "💰 成本分析",
+            "📊 历史表现",
+            "🎯 准确度",
+            "🔍 影响因素",
+            "📜 历史记录",
+            "📊 系统监控",
+            "⚙️ 系统管理"
         ])
         
         with tabs[0]:
