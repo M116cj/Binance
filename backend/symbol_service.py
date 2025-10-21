@@ -16,7 +16,7 @@ class BinanceSymbolService:
     
     def __init__(self):
         self.base_url = "https://api.binance.com"
-        self.cache: Optional[Dict] = None
+        self.cache: Optional[List[Dict[str, str]]] = None
         self.cache_time: Optional[datetime] = None
         self.cache_ttl = timedelta(hours=1)
     

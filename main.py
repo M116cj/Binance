@@ -15,7 +15,6 @@ from typing import Dict, List, Any, Optional
 from frontend.components.signal_card import SignalCard
 from frontend.components.regime_state import RegimeState
 from frontend.components.probability_window import ProbabilityWindow
-from frontend.components.cost_capacity import CostCapacity
 from frontend.components.backtest_performance import BacktestPerformance
 from frontend.components.calibration_analysis import CalibrationAnalysis
 from frontend.components.attribution_comparison import AttributionComparison
@@ -34,7 +33,6 @@ class CryptoSurgePredictionDashboard:
         self.signal_card = SignalCard()
         self.regime_state = RegimeState()
         self.probability_window = ProbabilityWindow()
-        self.cost_capacity = CostCapacity()
         self.backtest_performance = BacktestPerformance()
         self.calibration_analysis = CalibrationAnalysis()
         self.attribution_comparison = AttributionComparison()
@@ -270,18 +268,6 @@ class CryptoSurgePredictionDashboard:
         else:
             st.error("❌ 无法加载概率分析数据")
     
-    def render_cost_capacity(self):
-        """报告4：执行成本与容量"""
-        st.markdown("## 💰 交易成本分析")
-        st.caption("不同交易金额的手续费和滑点成本")
-        
-        params = {'symbol': st.session_state.selected_symbol}
-        data = self.fetch_data("reports/cost", params)
-        if data:
-            self.cost_capacity.render(data)
-        else:
-            st.error("❌ 无法加载成本分析数据")
-    
     def render_backtest_performance(self):
         """报告5：历史回测性能"""
         st.markdown("## 📊 历史表现回顾")
@@ -393,7 +379,6 @@ class CryptoSurgePredictionDashboard:
             "📡 实时信号", 
             "🌊 市场状态", 
             "📈 概率分析",
-            "💰 成本分析",
             "📊 历史表现",
             "🎯 准确度",
             "🔍 影响因素",
@@ -412,24 +397,21 @@ class CryptoSurgePredictionDashboard:
             self.render_probability_window()
             
         with tabs[3]:
-            self.render_cost_capacity()
-            
-        with tabs[4]:
             self.render_backtest_performance()
             
-        with tabs[5]:
+        with tabs[4]:
             self.render_calibration_analysis()
             
-        with tabs[6]:
+        with tabs[5]:
             self.render_attribution_comparison()
         
-        with tabs[7]:
+        with tabs[6]:
             self.render_signal_history()
         
-        with tabs[8]:
+        with tabs[7]:
             self.render_monitoring_dashboard()
         
-        with tabs[9]:
+        with tabs[8]:
             self.render_admin_panel()
 
 def main():
