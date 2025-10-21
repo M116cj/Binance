@@ -14,15 +14,15 @@ import time
 from datetime import datetime, timedelta
 
 class BacktestPerformance:
-    """Historical backtest performance analysis component"""
+    """历史回测表现分析组件"""
     
     def __init__(self):
-        self.component_name = "Historical Backtest Performance"
+        self.component_name = "历史表现分析"
     
     def render(self, data: Dict[str, Any]):
-        """Render the backtest performance analysis"""
+        """渲染历史回测表现分析"""
         if not data:
-            st.error("No backtest performance data available")
+            st.error("❌ 没有可用的历史表现数据")
             return
         
         # Header with key performance metrics
@@ -64,10 +64,13 @@ class BacktestPerformance:
         max_drawdown = performance_summary.get('max_drawdown', 0)
         hit_rate = performance_summary.get('hit_rate', 0)
         
+        period_map = {'30_days': '30天', '7_days': '7天', '90_days': '90天'}
+        period_display = period_map.get(period, period.replace('_', ' '))
+        
         st.markdown(f"""
-        ### 📊 Backtest Performance: {symbol}
-        **Period:** {period.replace('_', ' ').title()}  
-        *Updated: {time.strftime('%H:%M:%S', time.localtime(timestamp/1000))}*
+        ### 📊 历史表现分析: {symbol}
+        **统计周期:** {period_display}  
+        *更新时间: {time.strftime('%H:%M:%S', time.localtime(timestamp/1000))}*
         """)
         
         # Key performance metrics in columns
@@ -81,33 +84,37 @@ class BacktestPerformance:
                 color = "inverse"
             
             st.metric(
-                "Total Return", 
+                "总收益率", 
                 f"{total_return:.2%}",
                 delta=f"{total_return:.2%}",
-                delta_color=color
+                delta_color=color,
+                help="策略在统计周期内的总收益"
             )
         
         with col2:
             st.metric(
-                "Sharpe Ratio",
+                "夏普比率",
                 f"{sharpe_ratio:.2f}",
-                delta="Post-cost" if sharpe_ratio > 1.0 else "Below target"
+                delta="良好" if sharpe_ratio > 1.0 else "需提升",
+                help="风险调整后的收益指标，越高越好"
             )
         
         with col3:
             color = "normal" if max_drawdown < -0.05 else "inverse"
             st.metric(
-                "Max Drawdown",
+                "最大回撤",
                 f"{max_drawdown:.2%}",
                 delta=f"{max_drawdown:.2%}",
-                delta_color=color
+                delta_color=color,
+                help="从最高点到最低点的最大跌幅"
             )
         
         with col4:
             st.metric(
-                "Hit Rate",
+                "胜率",
                 f"{hit_rate:.1%}",
-                delta="Above 50%" if hit_rate > 0.5 else "Below 50%"
+                delta="超过50%" if hit_rate > 0.5 else "低于50%",
+                help="预测正确的次数占总次数的比例"
             )
     
     def _render_equity_curve(self, data: Dict[str, Any]):

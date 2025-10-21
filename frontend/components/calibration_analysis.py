@@ -14,15 +14,15 @@ import time
 from datetime import datetime
 
 class CalibrationAnalysis:
-    """Model calibration and error analysis component"""
+    """模型校准和误差分析组件"""
     
     def __init__(self):
-        self.component_name = "Model Calibration & Error Analysis"
+        self.component_name = "预测准确度分析"
     
     def render(self, data: Dict[str, Any]):
-        """Render the calibration analysis"""
+        """渲染校准分析"""
         if not data:
-            st.error("No calibration analysis data available")
+            st.error("❌ 没有可用的校准数据")
             return
         
         # Header with calibration metrics
@@ -61,20 +61,21 @@ class CalibrationAnalysis:
         log_loss = calibration_metrics.get('log_loss', 0)
         
         st.markdown(f"""
-        ### 🎯 Calibration Analysis: {symbol}
-        *Updated: {time.strftime('%H:%M:%S', time.localtime(timestamp/1000))}*
+        ### 🎯 预测准确度分析: {symbol}
+        *更新时间: {time.strftime('%H:%M:%S', time.localtime(timestamp/1000))}*
         """)
         
-        # Key calibration metrics
+        # 关键校准指标
         col1, col2, col3 = st.columns(3)
         
         with col1:
             color = "inverse" if brier_score < 0.2 else "normal"
             st.metric(
-                "Brier Score",
+                "预测误差分数",
                 f"{brier_score:.4f}",
-                delta="Well calibrated" if brier_score < 0.2 else "Needs improvement",
-                delta_color=color
+                delta="校准良好" if brier_score < 0.2 else "需要改进",
+                delta_color=color,
+                help="Brier Score: 越小越好，表示预测越准确"
             )
         
         with col2:

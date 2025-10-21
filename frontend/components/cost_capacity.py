@@ -13,15 +13,15 @@ from typing import Dict, Any, List, Optional
 import time
 
 class CostCapacity:
-    """Execution cost and capacity analysis component"""
+    """交易成本和容量分析组件"""
     
     def __init__(self):
-        self.component_name = "Execution Cost & Capacity Analysis"
+        self.component_name = "交易成本分析"
     
     def render(self, data: Dict[str, Any]):
-        """Render the cost and capacity analysis"""
+        """渲染交易成本分析"""
         if not data:
-            st.error("No cost & capacity data available")
+            st.error("❌ 没有可用的成本分析数据")
             return
         
         # Header with key metrics
@@ -50,19 +50,19 @@ class CostCapacity:
         capacity_pct = data.get('capacity_pct', 0)
         
         st.markdown(f"""
-        ### 💰 Execution Cost & Capacity: {symbol}
-        **Optimal Size:** ${optimal_size_usd:,.0f}  
-        **Current Capacity:** {capacity_pct:.1%}  
-        *Updated: {time.strftime('%H:%M:%S', time.localtime(timestamp/1000))}*
+        ### 💰 交易成本分析: {symbol}
+        **建议交易金额:** ${optimal_size_usd:,.0f}  
+        **当前容量使用:** {capacity_pct:.1%}  
+        *更新时间: {time.strftime('%H:%M:%S', time.localtime(timestamp/1000))}*
         """)
         
-        # Capacity status indicator
+        # 容量状态指示
         if capacity_pct < 0.3:
-            st.success("🟢 Low capacity utilization - room for larger positions")
+            st.success("🟢 容量使用率低 - 可以交易更大金额")
         elif capacity_pct < 0.7:
-            st.info("🟡 Moderate capacity utilization")
+            st.info("🟡 容量使用率适中")
         else:
-            st.warning("🔴 High capacity utilization - consider position splitting")
+            st.warning("🔴 容量使用率高 - 建议分批交易")
     
     def _render_cost_breakdown(self, data: Dict[str, Any]):
         """Render detailed cost breakdown"""

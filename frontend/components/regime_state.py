@@ -13,15 +13,15 @@ from typing import Dict, Any, List, Optional
 import time
 
 class RegimeState:
-    """Market regime and liquidity state component"""
+    """市场状态和流动性分析组件"""
     
     def __init__(self):
-        self.component_name = "Market Regime & Liquidity State"
+        self.component_name = "市场状态分析"
     
     def render(self, data: Dict[str, Any]):
-        """Render the market regime analysis"""
+        """渲染市场状态分析"""
         if not data:
-            st.error("No regime data available")
+            st.error("❌ 没有可用的市场状态数据")
             return
         
         # Header with current regime
@@ -58,15 +58,24 @@ class RegimeState:
         depth_icon = self._get_depth_icon(depth_info.get('bucket', 'medium'))
         funding_icon = self._get_funding_icon(funding_info.get('bucket', 'neutral'))
         
+        # 波动性等级映射
+        vol_map = {'low': '低', 'medium': '中', 'high': '高'}
+        depth_map = {'thin': '薄', 'medium': '中', 'thick': '厚'}
+        funding_map = {'negative': '负费率', 'neutral': '中性', 'positive': '正费率'}
+        
+        vol_bucket = vol_info.get('bucket', 'medium')
+        depth_bucket = depth_info.get('bucket', 'medium')
+        funding_bucket = funding_info.get('bucket', 'neutral')
+        
         st.markdown(f"""
-        ### 🌊 Market Regime Analysis
-        **Current Regime:** `{regime}`
+        ### 🌊 市场状态分析
+        **当前状态:** `{regime}`
         
-        {vol_icon} **Volatility:** {vol_info.get('bucket', 'medium').title()} ({vol_info.get('value', 0):.2f})  
-        {depth_icon} **Depth:** {depth_info.get('bucket', 'medium').title()} ({depth_info.get('value', 0):.2f})  
-        {funding_icon} **Funding:** {funding_info.get('bucket', 'neutral').title()} ({funding_info.get('value', 0):.4f})
+        {vol_icon} **波动性:** {vol_map.get(vol_bucket, vol_bucket)} ({vol_info.get('value', 0):.2f})  
+        {depth_icon} **市场深度:** {depth_map.get(depth_bucket, depth_bucket)} ({depth_info.get('value', 0):.2f})  
+        {funding_icon} **资金费率:** {funding_map.get(funding_bucket, funding_bucket)} ({funding_info.get('value', 0):.4f})
         
-        *Updated: {time.strftime('%H:%M:%S', time.localtime(timestamp/1000))}*
+        *更新时间: {time.strftime('%H:%M:%S', time.localtime(timestamp/1000))}*
         """)
     
     def _get_volatility_icon(self, bucket: str) -> str:
