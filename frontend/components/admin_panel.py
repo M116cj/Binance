@@ -1,4 +1,4 @@
-"""Admin panel for model versioning, threshold tuning, and system configuration."""
+"""管理面板：模型版本控制、阈值调优和系统配置"""
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -6,12 +6,12 @@ from typing import Dict, Any, Optional
 
 
 class AdminPanel:
-    """Admin interface for system configuration and model management"""
+    """系统配置和模型管理的管理界面"""
     
     def render(self, models_data: Optional[Dict] = None, signals_stats: Optional[Dict] = None):
-        """Render the admin panel interface"""
+        """渲染管理面板界面"""
         
-        # Create sub-tabs for different admin functions
+        # 为不同的管理功能创建子标签
         admin_tabs = st.tabs(["🔧 Model Versions", "⚙️ Threshold Presets", "📤 Signal Export", "📊 System Stats"])
         
         with admin_tabs[0]:
@@ -27,7 +27,7 @@ class AdminPanel:
             self._render_system_stats(signals_stats)
     
     def _render_model_versions(self, models_data: Optional[Dict]):
-        """Render model version management interface"""
+        """渲染模型版本管理界面"""
         st.markdown("### Model Version Management")
         
         if not models_data or 'models' not in models_data:
@@ -40,7 +40,7 @@ class AdminPanel:
             st.info("No models deployed yet")
             return
         
-        # Create DataFrame for models
+        # 为模型创建DataFrame
         df_data = []
         for model in models:
             df_data.append({
@@ -56,7 +56,7 @@ class AdminPanel:
         df = pd.DataFrame(df_data)
         st.dataframe(df, use_container_width=True, hide_index=True)
         
-        # Model deployment section
+        # 模型部署部分
         st.markdown("#### Deploy New Model Version")
         col1, col2, col3 = st.columns(3)
         
@@ -73,17 +73,17 @@ class AdminPanel:
             st.info("Model deployment is not available in demo mode")
     
     def _render_threshold_presets(self):
-        """Render threshold preset management"""
+        """渲染阈值预设管理"""
         st.markdown("### Threshold Configuration Presets")
         
-        # Display current presets
+        # 显示当前预设
         presets = {
             "A-tier (Conservative)": {"tau": 0.75, "kappa": 1.20, "theta_up": 0.006, "theta_dn": 0.004},
             "B-tier (Balanced)": {"tau": 0.65, "kappa": 1.00, "theta_up": 0.006, "theta_dn": 0.004},
             "C-tier (Aggressive)": {"tau": 0.55, "kappa": 0.80, "theta_up": 0.004, "theta_dn": 0.003},
         }
         
-        # Create DataFrame
+        # 创建DataFrame
         df_data = []
         for name, params in presets.items():
             df_data.append({
@@ -97,7 +97,7 @@ class AdminPanel:
         df = pd.DataFrame(df_data)
         st.dataframe(df, use_container_width=True, hide_index=True)
         
-        # Create new preset
+        # 创建新预设
         st.markdown("#### Create Custom Preset")
         col1, col2 = st.columns(2)
         
@@ -115,7 +115,7 @@ class AdminPanel:
         if st.button("💾 Save Preset (Demo)", disabled=True):
             st.info("Preset saving is not available in demo mode")
         
-        # Threshold optimization insights
+        # 阈值优化洞察
         st.markdown("#### 📈 Threshold Impact Analysis")
         
         col1, col2, col3 = st.columns(3)
@@ -127,17 +127,17 @@ class AdminPanel:
             st.metric("Expected Utility", "4.2", delta="+0.3")
     
     def _render_signal_export(self):
-        """Render signal export controls"""
+        """渲染信号导出控制"""
         st.markdown("### Signal Export Interface")
         
         st.markdown("""
-        Export trading signals for downstream consumption by trading bots or analytics systems.
-        Two formats are supported:
-        - **JSONL**: Newline-delimited JSON (human-readable, easy to parse)
-        - **Protobuf**: Binary format (compact, fast deserialization)
+        导出交易信号供下游交易机器人或分析系统使用。
+        支持两种格式：
+        - **JSONL**: 换行分隔的JSON（人类可读，易于解析）
+        - **Protobuf**: 二进制格式（紧凑，快速反序列化）
         """)
         
-        # Export filters
+        # 导出过滤器
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -149,7 +149,7 @@ class AdminPanel:
         with col3:
             export_tier = st.selectbox("Tier", ["All", "A", "B"])
         
-        # Time range
+        # 时间范围
         col1, col2 = st.columns(2)
         with col1:
             export_hours = st.number_input("Last N hours", min_value=1, max_value=168, value=24, key="export_hours")
@@ -157,12 +157,12 @@ class AdminPanel:
         with col2:
             export_limit = st.number_input("Max signals", min_value=10, max_value=10000, value=1000, key="export_limit")
         
-        # Export buttons
+        # 导出按钮
         col1, col2 = st.columns(2)
         
         with col1:
             if st.button("📥 Export JSONL", type="primary"):
-                # Build export URL with time range
+                # 构建带时间范围的导出URL
                 from datetime import datetime, timedelta
                 start_time = (datetime.now() - timedelta(hours=export_hours)).isoformat()
                 
@@ -184,7 +184,7 @@ class AdminPanel:
         
         with col2:
             if st.button("📥 Export Protobuf", type="secondary"):
-                # Build export URL with time range
+                # 构建带时间范围的导出URL
                 from datetime import datetime, timedelta
                 start_time = (datetime.now() - timedelta(hours=export_hours)).isoformat()
                 
@@ -204,7 +204,7 @@ class AdminPanel:
                 st.code(f"curl -o signals.pb '{export_url}'", language="bash")
                 st.success("Export URL generated! Use the command above to download.")
         
-        # Example usage
+        # 使用示例
         with st.expander("📖 Integration Example"):
             st.markdown("""
             **Python - JSONL Integration:**
@@ -233,14 +233,14 @@ class AdminPanel:
             """)
     
     def _render_system_stats(self, signals_stats: Optional[Dict]):
-        """Render system statistics and health"""
+        """渲染系统统计和健康状态"""
         st.markdown("### System Statistics & Health")
         
         if not signals_stats:
             st.warning("No statistics available")
             return
         
-        # Overall metrics
+        # 总体指标
         col1, col2, col3, col4 = st.columns(4)
         
         total_signals = signals_stats.get('total_signals', 0)
@@ -263,7 +263,7 @@ class AdminPanel:
         with col4:
             st.metric("Active Models", "1")
         
-        # Per-symbol breakdown
+        # 按交易对分组
         st.markdown("#### Signal Distribution by Symbol")
         
         if signals_stats.get('by_symbol'):
@@ -285,7 +285,7 @@ class AdminPanel:
         else:
             st.info("No signals generated yet")
         
-        # System health indicators
+        # 系统健康指标
         st.markdown("#### System Health")
         col1, col2 = st.columns(2)
         

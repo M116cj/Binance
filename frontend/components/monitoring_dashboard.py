@@ -1,4 +1,4 @@
-"""Monitoring dashboard for SLA metrics, latency tracking, and quality indicators."""
+"""监控仪表板：SLA指标、延迟跟踪和质量指标"""
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -9,47 +9,47 @@ import numpy as np
 
 
 class MonitoringDashboard:
-    """System monitoring dashboard with SLA and quality metrics"""
+    """系统监控仪表板：包含SLA和质量指标"""
     
     def render(self, fetch_data_fn: Callable):
-        """Render monitoring dashboard"""
+        """渲染监控仪表板"""
         
         st.markdown("### 📊 System Monitoring & SLA Tracking")
         
-        # Fetch system data
+        # 获取系统数据
         signals_stats = fetch_data_fn("signals/stats", {})
         models_data = fetch_data_fn("models", {})
         health_data = fetch_data_fn("health", {})
         
-        # Fetch recent signals for accurate percentile calculation
+        # 获取最近的信号以进行准确的百分位数计算
         recent_signals = fetch_data_fn("signals", {'limit': 1000})
         
-        # SLA Overview
+        # SLA概览
         self._render_sla_overview(signals_stats, health_data, recent_signals)
         
-        # Latency Tracking
+        # 延迟跟踪
         self._render_latency_tracking(fetch_data_fn)
         
-        # Quality Indicators
+        # 质量指标
         self._render_quality_indicators(signals_stats)
         
-        # System Health
+        # 系统健康状态
         self._render_system_health(health_data, models_data)
     
     def _render_sla_overview(self, signals_stats: Optional[Dict], health_data: Optional[Dict], recent_signals: Optional[Dict]):
-        """Render SLA compliance metrics"""
+        """渲染SLA合规指标"""
         st.markdown("#### 🎯 SLA Compliance Overview")
         
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            # Target: <800ms p99 latency
-            # Calculate real P99 from signal data
+            # 目标：P99延迟<800ms
+            # 从信号数据计算真实的P99
             if recent_signals and 'signals' in recent_signals and recent_signals['signals']:
                 latencies = [s.get('sla_latency_ms', 0) for s in recent_signals['signals']]
                 p99_latency = np.percentile(latencies, 99) if latencies else 0
             else:
-                # Fallback to average if no signals
+                # 如果没有信号，回退到平均值
                 avg_latency = 0
                 count = 0
                 if signals_stats and 'by_symbol' in signals_stats:
@@ -69,7 +69,7 @@ class MonitoringDashboard:
             )
         
         with col2:
-            # Target: ≥300 rps throughput capacity
+            # 目标：吞吐量容量≥300 rps
             total_signals = signals_stats.get('total_signals', 0) if signals_stats else 0
             rps = total_signals / (24 * 3600)  # Signals per second over 24h
             capacity_used_pct = (rps / 300) * 100 if rps > 0 else 0
@@ -82,13 +82,13 @@ class MonitoringDashboard:
             )
         
         with col3:
-            # Uptime - calculated from health status
+            # 运行时间 - 从健康状态计算
             status = health_data.get('status', 'unknown') if health_data else 'unknown'
             uptime_pct = 100.0 if status == 'healthy' else 0.0
             st.metric("⏰ System Status", status.title(), delta="Healthy" if status == 'healthy' else "")
         
         with col4:
-            # Exchange lag from health data
+            # 来自健康数据的交易所延迟
             if health_data:
                 exchange_lag = health_data.get('exchange_lag_s', 0)
                 lag_status = "✅" if exchange_lag < 2.0 else "⚠️"
@@ -96,14 +96,14 @@ class MonitoringDashboard:
                          delta=f"{2.0 - exchange_lag:.2f}s vs target",
                          delta_color="normal" if exchange_lag < 2.0 else "inverse")
         
-        # Note: Historical trend charts require time-series endpoint or signal history aggregation
-        # Omitted for now - would need /signals/history with hourly aggregation support
+        # 注意：历史趋势图需要时间序列端点或信号历史聚合
+        # 暂时省略 - 需要带有每小时聚合支持的/signals/history
     
     def _render_latency_tracking(self, fetch_data_fn: Callable):
-        """Render detailed latency distribution and tracking"""
+        """渲染详细的延迟分布和跟踪"""
         st.markdown("#### ⚡ Latency Distribution & Breakdown")
         
-        # Fetch recent signals for latency analysis
+        # 获取最近的信号以进行延迟分析
         signals_data = fetch_data_fn("signals", {'limit': 100})
         
         if not signals_data or 'signals' not in signals_data:
@@ -120,7 +120,7 @@ class MonitoringDashboard:
         col1, col2 = st.columns(2)
         
         with col1:
-            # Latency distribution histogram
+            # 延迟分布直方图
             fig_hist = go.Figure()
             
             fig_hist.add_trace(go.Histogram(
@@ -130,7 +130,7 @@ class MonitoringDashboard:
                 name='Latency Distribution'
             ))
             
-            # Add percentile lines
+            # 添加百分位数线
             p50 = np.percentile(latencies, 50)
             p95 = np.percentile(latencies, 95)
             p99 = np.percentile(latencies, 99)
@@ -153,7 +153,7 @@ class MonitoringDashboard:
             st.plotly_chart(fig_hist, use_container_width=True)
         
         with col2:
-            # Latency percentiles
+            # 延迟百分位数
             st.markdown("##### Latency Percentiles")
             
             percentiles_data = {
@@ -174,7 +174,7 @@ class MonitoringDashboard:
             
             st.dataframe(df, use_container_width=True, hide_index=True)
             
-            # Latency breakdown pie chart
+            # 延迟分解饼图
             st.markdown("##### Latency Ranges")
             
             ranges = {
@@ -200,7 +200,7 @@ class MonitoringDashboard:
             st.plotly_chart(fig_pie, use_container_width=True)
     
     def _render_quality_indicators(self, signals_stats: Optional[Dict]):
-        """Render signal quality and model performance indicators"""
+        """渲染信号质量和模型性能指标"""
         st.markdown("#### ✨ Quality Indicators")
         
         col1, col2, col3 = st.columns(3)
@@ -208,7 +208,7 @@ class MonitoringDashboard:
         with col1:
             st.markdown("##### Signal Quality")
             
-            # Calculate tier distribution from real data
+            # 从真实数据计算等级分布
             total_signals = signals_stats.get('total_signals', 0) if signals_stats else 0
             a_tier_total = 0
             b_tier_total = 0
@@ -239,10 +239,10 @@ class MonitoringDashboard:
             
             st.info("Pipeline metrics require dedicated metrics endpoint")
         
-        # Note: Trend charts require historical aggregation endpoint
+        # 注意：趋势图需要历史聚合端点
     
     def _render_system_health(self, health_data: Optional[Dict], models_data: Optional[Dict]):
-        """Render system health status"""
+        """渲染系统健康状态"""
         st.markdown("#### 🏥 System Health Status")
         
         col1, col2 = st.columns(2)
@@ -250,7 +250,7 @@ class MonitoringDashboard:
         with col1:
             st.markdown("##### System Status")
             
-            # Use real health data
+            # 使用真实的健康数据
             if health_data:
                 status = health_data.get('status', 'unknown')
                 timestamp = health_data.get('timestamp', 0)
@@ -265,7 +265,7 @@ class MonitoringDashboard:
             else:
                 st.warning("Health data not available")
             
-            # Model status
+            # 模型状态
             if models_data and 'models' in models_data:
                 active_models = sum(1 for m in models_data['models'] if m.get('is_active'))
                 st.metric("Active Models", active_models)

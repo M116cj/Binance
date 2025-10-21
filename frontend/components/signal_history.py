@@ -1,4 +1,4 @@
-"""Signal history component showing past predictions and outcomes."""
+"""信号历史组件：显示过往预测和结果"""
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -7,14 +7,14 @@ from typing import Dict, Any, Optional, List, Callable
 
 
 class SignalHistory:
-    """Display historical signals with filtering and analytics"""
+    """显示历史信号，支持过滤和分析"""
     
     def render(self, fetch_data_fn: Callable):
-        """Render signal history interface"""
+        """渲染信号历史界面"""
         
         st.markdown("### 📜 Signal History & Performance")
         
-        # Filters
+        # 过滤器
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -29,12 +29,12 @@ class SignalHistory:
         with col4:
             filter_hours = st.number_input("Last N hours", min_value=1, max_value=168, value=24, key="hist_hours")
         
-        # Build API request parameters based on filters
+        # 根据过滤器构建API请求参数
         params = {
-            'limit': 500  # Fetch more signals for filtering
+            'limit': 500  # 获取更多信号以供过滤
         }
         
-        # Only add filters if they're not "All"
+        # 仅在不是"All"时添加过滤器
         if filter_symbol != "All":
             params['symbol'] = filter_symbol
         if filter_decision != "All":
@@ -42,7 +42,7 @@ class SignalHistory:
         if filter_tier != "All":
             params['tier'] = filter_tier
         
-        # Fetch signals with filters applied
+        # 应用过滤器获取信号
         signals_data = fetch_data_fn("signals", params)
         
         if not signals_data or 'signals' not in signals_data:
@@ -55,7 +55,7 @@ class SignalHistory:
             st.info("No signals match your filters")
             return
         
-        # Filter by time range (client-side filtering for time)
+        # 按时间范围过滤（客户端时间过滤）
         cutoff_time = datetime.now() - timedelta(hours=filter_hours)
         signals = [
             s for s in signals 
@@ -66,7 +66,7 @@ class SignalHistory:
             st.info(f"No signals found in the last {filter_hours} hours with selected filters")
             return
         
-        # Convert to DataFrame
+        # 转换为DataFrame
         df = self._signals_to_dataframe(signals)
         
         # Summary metrics
@@ -79,7 +79,7 @@ class SignalHistory:
         self._render_performance_chart(df)
     
     def _signals_to_dataframe(self, signals: List[Dict]) -> pd.DataFrame:
-        """Convert signals list to pandas DataFrame"""
+        """将信号列表转换为pandas DataFrame"""
         rows = []
         for signal in signals:
             rows.append({
@@ -101,7 +101,7 @@ class SignalHistory:
         return df
     
     def _render_summary_metrics(self, df: pd.DataFrame):
-        """Render summary metrics cards"""
+        """渲染汇总指标卡片"""
         col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
@@ -128,10 +128,10 @@ class SignalHistory:
                      delta_color=color)
     
     def _render_signal_table(self, df: pd.DataFrame):
-        """Render interactive signal table"""
+        """渲染交互式信号表格"""
         st.markdown("#### Signal Details")
         
-        # Format the dataframe for display
+        # 格式化数据框以供显示
         display_df = df.copy()
         display_df['Time'] = display_df['Time'].dt.strftime('%Y-%m-%d %H:%M:%S')
         display_df['P(up)'] = display_df['P(up)'].apply(lambda x: f"{x:.3f}")
@@ -139,7 +139,7 @@ class SignalHistory:
         display_df['Return'] = display_df['Return'].apply(lambda x: f"{x:.4f}")
         display_df['Latency (ms)'] = display_df['Latency (ms)'].apply(lambda x: f"{x:.1f}")
         
-        # Style based on decision and tier
+        # 根据决策和等级设置样式
         def style_decision(row):
             if row['Decision'] == 'LONG':
                 return ['background-color: rgba(0, 255, 0, 0.1)'] * len(row)
@@ -155,7 +155,7 @@ class SignalHistory:
             height=400
         )
         
-        # Download option
+        # 下载选项
         csv = df.to_csv(index=False)
         st.download_button(
             label="📥 Download as CSV",
@@ -165,10 +165,10 @@ class SignalHistory:
         )
     
     def _render_performance_chart(self, df: pd.DataFrame):
-        """Render performance over time chart"""
+        """渲染性能随时间变化图表"""
         st.markdown("#### Performance Over Time")
         
-        # Group by hour
+        # 按小时分组
         df_hourly = df.copy()
         df_hourly['Hour'] = df_hourly['Time'].dt.floor('H')
         
@@ -180,10 +180,10 @@ class SignalHistory:
         }).reset_index()
         hourly_stats.columns = ['Hour', 'Avg Utility', 'Avg P(up)', 'Avg Latency', 'Signal Count']
         
-        # Create subplot
+        # 创建子图
         fig = go.Figure()
         
-        # Add traces
+        # 添加轨迹
         fig.add_trace(go.Scatter(
             x=hourly_stats['Hour'],
             y=hourly_stats['Avg Utility'],
@@ -203,7 +203,7 @@ class SignalHistory:
             marker=dict(size=8)
         ))
         
-        # Update layout
+        # 更新布局
         fig.update_layout(
             title='Signal Performance Trends',
             xaxis_title='Time',
@@ -220,7 +220,7 @@ class SignalHistory:
         
         st.plotly_chart(fig, use_container_width=True)
         
-        # Decision distribution
+        # 决策分布
         col1, col2 = st.columns(2)
         
         with col1:
