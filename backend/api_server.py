@@ -655,12 +655,14 @@ async def get_signal_stats(
     
     # 使用SQL聚合而不是加载所有数据到内存
     # 批量查询优化：使用group by进行聚合
+    from sqlalchemy import case
+    
     stats_query = db.query(
         Signal.symbol,
         func.count(Signal.id).label('total'),
-        func.sum(func.case((Signal.tier == 'A', 1), else_=0)).label('a_tier'),
-        func.sum(func.case((Signal.tier == 'B', 1), else_=0)).label('b_tier'),
-        func.sum(func.case((Signal.decision == 'LONG', 1), else_=0)).label('long_count'),
+        func.sum(case((Signal.tier == 'A', 1), else_=0)).label('a_tier'),
+        func.sum(case((Signal.tier == 'B', 1), else_=0)).label('b_tier'),
+        func.sum(case((Signal.decision == 'LONG', 1), else_=0)).label('long_count'),
         func.avg(Signal.net_utility).label('avg_utility'),
         func.avg(Signal.sla_latency_ms).label('avg_latency')
     ).filter(
