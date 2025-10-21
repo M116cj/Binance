@@ -1,6 +1,6 @@
 """
-Standalone API server for crypto surge prediction dashboard.
-Demo mode with mock data - doesn't require Redis/ClickHouse.
+加密货币涨跌预测仪表板的独立API服务器
+演示模式使用模拟数据 - 不需要Redis/ClickHouse
 """
 
 import time
@@ -33,11 +33,11 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup"""
+    """启动时初始化数据库"""
     logger.info("Initializing database...")
     db_manager.initialize()
     
-    # Create default model version if not exists
+    # 创建默认模型版本（如果不存在）
     with db_manager.get_session() as db:
         existing_model = db.query(ModelVersion).filter(ModelVersion.version == "1.0.0").first()
         if not existing_model:
@@ -58,11 +58,11 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Close database connections"""
+    """关闭数据库连接"""
     db_manager.close()
 
 def generate_mock_time_series(days: int, start_value: float = 0.0) -> Dict:
-    """Generate mock time series data"""
+    """生成模拟时间序列数据"""
     dates = [(datetime.now() - timedelta(days=days-i)).isoformat() for i in range(days)]
     cumulative_returns = np.cumsum(np.random.normal(0.002, 0.02, days)).tolist()
     return {
@@ -90,7 +90,7 @@ def save_signal_to_db(
     regime: str = "normal",
     volatility: float = 0.02
 ) -> Signal:
-    """Save a generated signal to the database"""
+    """将生成的信号保存到数据库"""
     signal_id = f"{symbol}_{horizon_min}m_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
     
     now = datetime.utcnow()
@@ -132,7 +132,7 @@ def save_signal_to_db(
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """健康检查端点"""
     return {
         "status": "healthy",
         "timestamp": int(time.time() * 1000),
@@ -149,7 +149,7 @@ async def get_realtime_signal_card(
     kappa: float = Query(1.20, description="Utility threshold"),
     db: Session = Depends(get_db)
 ):
-    """Report 1: Real-time Signal Card"""
+    """报告1：实时信号卡片"""
     p_up_5 = np.random.uniform(0.55, 0.85)
     p_up_10 = np.random.uniform(0.50, 0.80)
     p_up_30 = np.random.uniform(0.45, 0.75)
@@ -171,7 +171,7 @@ async def get_realtime_signal_card(
     
     sla_latency = np.random.uniform(50, 200)
     
-    # Save signal to database (5min horizon)
+    # 保存信号到数据库（5分钟时间窗口）
     if decision_action != "WAIT":
         try:
             save_signal_to_db(
@@ -225,7 +225,7 @@ async def get_realtime_signal_card(
 
 @app.get("/reports/regime")
 async def get_regime_state(symbol: str = Query(..., description="Trading symbol")):
-    """Report 2: Market Regime & Liquidity State"""
+    """报告2：市场状态与流动性"""
     regimes = ['calm', 'choppy', 'trending', 'volatile']
     regime = np.random.choice(regimes, p=[0.3, 0.3, 0.2, 0.2])
     
@@ -259,7 +259,7 @@ async def get_probability_window(
     theta_up: float = Query(0.006, description="Up threshold"),
     theta_dn: float = Query(0.004, description="Down threshold")
 ):
-    """Report 3: Pre-Surge Probability & Time Window"""
+    """报告3：预测概率与时间窗口"""
     horizons = [5, 10, 15, 30, 60]
     probabilities = [np.random.uniform(0.45, 0.85) for _ in horizons]
     
@@ -287,7 +287,7 @@ async def get_probability_window(
 
 @app.get("/reports/cost")
 async def get_cost_capacity(symbol: str = Query(..., description="Trading symbol")):
-    """Report 4: Execution Cost & Capacity Analysis"""
+    """报告4：执行成本与容量分析"""
     sizes = [1000, 5000, 10000, 50000, 100000]
     costs = [size * np.random.uniform(0.0001, 0.0005) for size in sizes]
     
@@ -322,7 +322,7 @@ async def get_backtest_performance(
     kappa: float = Query(1.20, description="Utility threshold"),
     days_back: int = Query(30, description="Days to backtest")
 ):
-    """Report 5: Historical Backtest Performance"""
+    """报告5：历史回测性能"""
     time_series = generate_mock_time_series(days_back)
     
     return {
@@ -359,7 +359,7 @@ async def get_calibration_analysis(
     theta_up: float = Query(0.006, description="Up threshold"),
     theta_dn: float = Query(0.004, description="Down threshold")
 ):
-    """Report 6: Model Calibration & Error Analysis"""
+    """报告6：模型校准与误差分析"""
     n_bins = 10
     pred_probs = [i/n_bins + np.random.uniform(-0.02, 0.02) for i in range(n_bins)]
     obs_freqs = [p + np.random.uniform(-0.05, 0.05) for p in pred_probs]
@@ -405,7 +405,7 @@ async def get_attribution_comparison(
     tau: float = Query(0.75, description="Probability threshold"),
     kappa: float = Query(1.20, description="Utility threshold")
 ):
-    """Report 7: Event Attribution & Strategy Comparison"""
+    """报告7：事件归因与策略对比"""
     features = ['qi_1', 'ofi_10', 'microprice_dev', 'rv_ratio', 'depth_slope', 'funding_delta', 'oi_pressure', 'arrival_rate']
     importance = [np.random.uniform(-0.3, 0.3) for _ in features]
     
@@ -473,7 +473,7 @@ async def get_recent_signals(
     limit: int = Query(20, description="Number of signals to return"),
     db: Session = Depends(get_db)
 ):
-    """Get recent trading signals"""
+    """获取最近的交易信号"""
     query = db.query(Signal).order_by(Signal.created_at.desc())
     
     if symbol:
@@ -509,7 +509,7 @@ async def get_signal_history(
     hours: int = Query(24, description="Hours of history to retrieve"),
     db: Session = Depends(get_db)
 ):
-    """Get signal history for a specific symbol"""
+    """获取特定交易对的信号历史"""
     cutoff_time = datetime.utcnow() - timedelta(hours=hours)
     
     signals = db.query(Signal).filter(
@@ -517,7 +517,7 @@ async def get_signal_history(
         Signal.created_at >= cutoff_time
     ).order_by(Signal.created_at.asc()).all()
     
-    # Calculate stats
+    # 计算统计数据
     total_signals = len(signals)
     a_tier_count = sum(1 for s in signals if s.tier == 'A')
     b_tier_count = sum(1 for s in signals if s.tier == 'B')
@@ -554,12 +554,12 @@ async def get_signal_history(
 async def get_signal_stats(
     db: Session = Depends(get_db)
 ):
-    """Get overall signal statistics"""
-    # Get signals from last 24 hours
+    """获取总体信号统计数据"""
+    # 获取过去24小时的信号
     cutoff_time = datetime.utcnow() - timedelta(hours=24)
     recent_signals = db.query(Signal).filter(Signal.created_at >= cutoff_time).all()
     
-    # Calculate statistics by symbol
+    # 按交易对计算统计数据
     symbols_stats = {}
     for signal in recent_signals:
         if signal.symbol not in symbols_stats:
@@ -583,7 +583,7 @@ async def get_signal_stats(
         stats['utilities'].append(signal.net_utility)
         stats['latencies'].append(signal.sla_latency_ms)
     
-    # Format results
+    # 格式化结果
     results = {}
     for symbol, stats in symbols_stats.items():
         results[symbol] = {
@@ -605,7 +605,7 @@ async def get_signal_stats(
 async def get_model_versions(
     db: Session = Depends(get_db)
 ):
-    """Get all model versions"""
+    """获取所有模型版本"""
     models = db.query(ModelVersion).order_by(ModelVersion.created_at.desc()).all()
     
     return {
@@ -632,22 +632,22 @@ async def export_signals_protobuf(
     limit: int = Query(1000, le=10000),
     db: Session = Depends(get_db)
 ):
-    """Export signals in binary Protobuf format for downstream trading bots.
+    """导出信号为二进制Protobuf格式，供下游交易机器人使用
     
-    Args:
-        symbol: Filter by symbol (e.g., BTCUSDT)
-        decision: Filter by decision (LONG, SHORT, WAIT)
-        tier: Filter by tier (A, B, C)
-        start_time: ISO format start time
-        end_time: ISO format end time
-        limit: Maximum number of signals (max 10000)
+    参数:
+        symbol: 按交易对过滤 (例如: BTCUSDT)
+        decision: 按决策过滤 (LONG, SHORT, WAIT)
+        tier: 按等级过滤 (A, B, C)
+        start_time: ISO格式开始时间
+        end_time: ISO格式结束时间
+        limit: 最大信号数量 (最多10000)
     
-    Returns:
-        Binary Protobuf serialized SignalBatch
+    返回:
+        二进制Protobuf序列化的SignalBatch
     """
     query = db.query(Signal)
     
-    # Apply filters
+    # 应用过滤器
     if symbol:
         query = query.filter(Signal.symbol == symbol)
     if decision:
@@ -659,14 +659,14 @@ async def export_signals_protobuf(
     if end_time:
         query = query.filter(Signal.created_at <= datetime.fromisoformat(end_time))
     
-    # Order by timestamp and limit
+    # 按时间戳排序并限制数量
     signals = query.order_by(Signal.created_at.desc()).limit(limit).all()
     
-    # Convert to Protobuf batch
+    # 转换为Protobuf批次
     export_id = f"pb_{int(datetime.utcnow().timestamp() * 1000)}"
     pb_batch = signals_to_protobuf_batch(signals, export_id=export_id)
     
-    # Serialize to binary
+    # 序列化为二进制
     binary_data = pb_batch.SerializeToString()
     
     return Response(
@@ -689,22 +689,22 @@ async def export_signals_jsonl(
     limit: int = Query(1000, le=10000),
     db: Session = Depends(get_db)
 ):
-    """Export signals in JSONL format (newline-delimited JSON) for downstream systems.
+    """导出信号为JSONL格式（换行分隔的JSON），供下游系统使用
     
-    Args:
-        symbol: Filter by symbol (e.g., BTCUSDT)
-        decision: Filter by decision (LONG, SHORT, WAIT)
-        tier: Filter by tier (A, B, C)
-        start_time: ISO format start time
-        end_time: ISO format end time
-        limit: Maximum number of signals (max 10000)
+    参数:
+        symbol: 按交易对过滤 (例如: BTCUSDT)
+        decision: 按决策过滤 (LONG, SHORT, WAIT)
+        tier: 按等级过滤 (A, B, C)
+        start_time: ISO格式开始时间
+        end_time: ISO格式结束时间
+        limit: 最大信号数量 (最多10000)
     
-    Returns:
-        JSONL text file (one JSON object per line)
+    返回:
+        JSONL文本文件（每行一个JSON对象）
     """
     query = db.query(Signal)
     
-    # Apply filters
+    # 应用过滤器
     if symbol:
         query = query.filter(Signal.symbol == symbol)
     if decision:
@@ -716,10 +716,10 @@ async def export_signals_jsonl(
     if end_time:
         query = query.filter(Signal.created_at <= datetime.fromisoformat(end_time))
     
-    # Order by timestamp and limit
+    # 按时间戳排序并限制数量
     signals = query.order_by(Signal.created_at.desc()).limit(limit).all()
     
-    # Convert to JSONL
+    # 转换为JSONL
     export_id = f"jsonl_{int(datetime.utcnow().timestamp() * 1000)}"
     jsonl_data = signals_to_jsonl(signals)
     
