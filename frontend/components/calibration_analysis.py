@@ -141,7 +141,7 @@ class CalibrationAnalysis:
             yaxis=dict(range=[0, 1])
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Calibration statistics
         if len(predicted_probs) > 0:
@@ -183,7 +183,7 @@ class CalibrationAnalysis:
             showlegend=False
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         st.markdown(f"""
         **Interpretation:**
@@ -227,7 +227,7 @@ class CalibrationAnalysis:
             showlegend=True
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Residual statistics
         std_residual = np.std(residuals)
@@ -277,7 +277,7 @@ class CalibrationAnalysis:
             showlegend=True
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Prediction statistics
         mean_pred = np.mean(predictions)
@@ -334,7 +334,7 @@ class CalibrationAnalysis:
             yaxis=dict(range=[0, 1])
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         st.info("Isotonic regression ensures monotonicity and improves calibration")
     
@@ -356,7 +356,7 @@ class CalibrationAnalysis:
         # Display metrics in a table
         metrics_df = pd.DataFrame({
             'Metric': ['MAE', 'MSE', 'RMSE', 'MAPE'],
-            'Value': [mae, mse, rmse, f"{mape:.2f}%"],
+            'Value': [f"{mae:.4f}", f"{mse:.4f}", f"{rmse:.4f}", f"{mape:.2f}%"],
             'Description': [
                 'Mean Absolute Error',
                 'Mean Squared Error',
@@ -365,7 +365,7 @@ class CalibrationAnalysis:
             ]
         })
         
-        st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+        st.dataframe(metrics_df, width='stretch', hide_index=True)
         
         # Visual representation
         fig = go.Figure()
@@ -388,7 +388,7 @@ class CalibrationAnalysis:
             showlegend=False
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Model quality assessment
         if mae < 0.05:

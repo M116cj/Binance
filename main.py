@@ -196,7 +196,7 @@ class CryptoSurgePredictionDashboard:
             help="开启后每秒自动更新数据"
         )
         
-        if st.sidebar.button("🔄 立即刷新", use_container_width=True):
+        if st.sidebar.button("🔄 立即刷新", width='stretch'):
             st.session_state.last_update = time.time()
             st.rerun()
             

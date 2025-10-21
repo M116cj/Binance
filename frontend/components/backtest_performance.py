@@ -162,7 +162,7 @@ class BacktestPerformance:
             showlegend=True
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Performance statistics
         if cumulative_returns:
@@ -259,7 +259,7 @@ class BacktestPerformance:
         
         fig.update_layout(height=400, showlegend=True)
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     def _render_drawdown_analysis(self, data: Dict[str, Any]):
         """Render drawdown analysis"""
@@ -316,7 +316,7 @@ class BacktestPerformance:
             height=250
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Drawdown statistics
         performance_summary = data.get('performance_summary', {})
@@ -382,7 +382,7 @@ class BacktestPerformance:
             height=250
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Hit rate quality assessment
         best_hit_rate = max(hit_rates) if hit_rates else 0
@@ -424,7 +424,7 @@ class BacktestPerformance:
             height=250
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Signal frequency metrics
         col1, col2 = st.columns(2)
@@ -484,7 +484,7 @@ class BacktestPerformance:
             height=250
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # PR-AUC assessment
         if pr_auc > 0.7:
@@ -530,7 +530,7 @@ class BacktestPerformance:
             height=200
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Trade statistics
         win_rate = winning_trades / max(total_trades, 1)
@@ -593,7 +593,7 @@ class BacktestPerformance:
                 height=200
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Distribution characteristics
         st.markdown("**Return Distribution:**")

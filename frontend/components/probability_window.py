@@ -155,7 +155,7 @@ class ProbabilityWindow:
         fig.update_yaxes(title_text="Probability", row=1, col=1)
         fig.update_yaxes(title_text="Expected Return / Utility", row=2, col=1)
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     def _render_expected_returns_analysis(self, data: Dict[str, Any]):
         """渲染预期收益分析"""
@@ -195,7 +195,7 @@ class ProbabilityWindow:
             height=250
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Summary statistics
         best_return_horizon = horizons[returns.index(max(returns))]
@@ -261,7 +261,7 @@ class ProbabilityWindow:
             height=250
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Efficiency metrics
         avg_efficiency = np.mean(efficiency_ratios)
@@ -326,7 +326,7 @@ class ProbabilityWindow:
             height=300
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Utility ranking
         horizon_utility_pairs = list(zip(horizons, utility_values))
@@ -363,7 +363,7 @@ class ProbabilityWindow:
         
         if comparison_data:
             df = pd.DataFrame(comparison_data)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width='stretch')
             
             # Visualization of category performance
             categories_short = [item['Category'] for item in comparison_data]
@@ -399,7 +399,7 @@ class ProbabilityWindow:
                 height=250
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
     
     def _render_strategy_recommendations(self, data: Dict[str, Any], tau: float, kappa: float):
         """渲染基于分析的策略建议"""

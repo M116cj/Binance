@@ -106,7 +106,7 @@ class CostCapacity:
             height=300
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Summary metrics
         total_cost = cost_breakdown.get('total_cost_estimate', sum(values))
@@ -149,7 +149,7 @@ class CostCapacity:
             height=250
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Show percentile table
         percentile_data = []
@@ -160,7 +160,7 @@ class CostCapacity:
                 'Slippage ($)': f"${slippage_analysis.get(p, 0) * 10000:.2f}"  # Assuming $10k position
             })
         
-        st.dataframe(pd.DataFrame(percentile_data), use_container_width=True)
+        st.dataframe(pd.DataFrame(percentile_data), width='stretch')
     
     def _render_capacity_curve(self, data: Dict[str, Any]):
         """Render utility-size capacity curve"""
@@ -234,7 +234,7 @@ class CostCapacity:
             height=400
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Optimal size info
         st.success(f"🎯 Optimal Size: ${optimal_size:,.0f} (U = {optimal_utility:.2f})")
@@ -283,7 +283,7 @@ class CostCapacity:
             ))
             
             fig.update_layout(height=200, margin=dict(l=20, r=20, t=40, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Market impact visualization
         st.markdown("**Market Impact Analysis:**")
@@ -310,7 +310,7 @@ class CostCapacity:
             height=250
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     def _render_execution_recommendations(self, data: Dict[str, Any]):
         """Render execution recommendations"""

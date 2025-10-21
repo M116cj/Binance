@@ -161,7 +161,7 @@ class RegimeState:
             height=300
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Funding regime overlay
         funding_value = regime_components.get('funding', {}).get('value', 0)
@@ -213,7 +213,7 @@ class RegimeState:
             ))
             
             fig.update_layout(height=200, margin=dict(l=20, r=20, t=40, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
     
     def _render_market_pressure_gauges(self, data: Dict[str, Any]):
         """Render market pressure indicators"""
@@ -282,7 +282,7 @@ class RegimeState:
         ), row=3, col=1)
         
         fig.update_layout(height=400, margin=dict(l=20, r=20, t=50, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     def _render_depth_profile(self, data: Dict[str, Any]):
         """Render 5-level order book depth profile"""
@@ -330,7 +330,7 @@ class RegimeState:
             showlegend=True
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Show depth statistics
         total_bid_liq = sum(bid_sizes)
@@ -417,7 +417,7 @@ class RegimeState:
             ))
             
             fig.update_layout(height=200, margin=dict(l=20, r=20, t=40, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             if stability_score > 0.8:
                 st.success("🟢 Stable regime")

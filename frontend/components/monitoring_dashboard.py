@@ -150,7 +150,7 @@ class MonitoringDashboard:
                 template='plotly_dark'
             )
             
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.plotly_chart(fig_hist, width='stretch')
         
         with col2:
             # 延迟百分位数
@@ -172,7 +172,7 @@ class MonitoringDashboard:
             df = pd.DataFrame(percentiles_data)
             df['Latency (ms)'] = df['Latency (ms)'].apply(lambda x: f"{x:.1f}")
             
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, width='stretch', hide_index=True)
             
             # 延迟分解饼图
             st.markdown("##### Latency Ranges")
@@ -197,7 +197,7 @@ class MonitoringDashboard:
                 showlegend=True
             )
             
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, width='stretch')
     
     def _render_quality_indicators(self, signals_stats: Optional[Dict]):
         """渲染信号质量和模型性能指标"""

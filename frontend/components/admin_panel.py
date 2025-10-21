@@ -54,7 +54,7 @@ class AdminPanel:
             })
         
         df = pd.DataFrame(df_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width='stretch', hide_index=True)
         
         # 模型部署部分
         st.markdown("#### Deploy New Model Version")
@@ -95,7 +95,7 @@ class AdminPanel:
             })
         
         df = pd.DataFrame(df_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width='stretch', hide_index=True)
         
         # 创建新预设
         st.markdown("#### Create Custom Preset")
@@ -281,7 +281,7 @@ class AdminPanel:
             
             if symbol_data:
                 df = pd.DataFrame(symbol_data)
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(df, width='stretch', hide_index=True)
         else:
             st.info("No signals generated yet")
         

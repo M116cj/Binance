@@ -151,7 +151,7 @@ class SignalCard:
                     margin=dict(l=20, r=20, t=40, b=20)
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 
                 # 显示置信区间
                 confidence_pct = int((ci_high - ci_low) * 100)
@@ -195,7 +195,7 @@ class SignalCard:
             margin=dict(l=20, r=20, t=40, b=20)
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # 详细分解
         st.markdown("**💵 收益明细：**")
@@ -349,7 +349,7 @@ class SignalCard:
             margin=dict(l=20, r=20, t=40, b=20)
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # 特征说明
         feature_explanations = {

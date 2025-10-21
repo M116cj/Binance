@@ -133,7 +133,7 @@ class AttributionComparison:
             showlegend=False
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Feature importance summary
         total_attribution = sum(abs(score) for score in importance_scores)
@@ -200,7 +200,7 @@ class AttributionComparison:
             showlegend=False
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     def _render_strategy_comparison(self, data: Dict[str, Any]):
         """Render comparison of different strategies"""
@@ -256,7 +256,7 @@ class AttributionComparison:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Best strategy
         best_strategy_idx = np.argmax(returns)
@@ -320,7 +320,7 @@ class AttributionComparison:
             showlegend=True
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Optimal threshold
         if returns_by_tau:
@@ -382,7 +382,7 @@ class AttributionComparison:
             showlegend=True
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Event summary
         win_count = sum(1 for e in events if e.get('outcome') == 'Win')
@@ -428,7 +428,7 @@ class AttributionComparison:
             height=300
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # Calculate metrics
         total = true_positives + false_positives + true_negatives + false_negatives

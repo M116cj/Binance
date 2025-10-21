@@ -150,7 +150,7 @@ class SignalHistory:
         
         st.dataframe(
             display_df,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             height=400
         )
@@ -170,7 +170,7 @@ class SignalHistory:
         
         # 按小时分组
         df_hourly = df.copy()
-        df_hourly['Hour'] = df_hourly['Time'].dt.floor('H')
+        df_hourly['Hour'] = df_hourly['Time'].dt.floor('h')
         
         hourly_stats = df_hourly.groupby('Hour').agg({
             'Utility': 'mean',
@@ -218,7 +218,7 @@ class SignalHistory:
             template='plotly_dark'
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # 决策分布
         col1, col2 = st.columns(2)
@@ -240,7 +240,7 @@ class SignalHistory:
                 showlegend=True
             )
             
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, width='stretch')
         
         with col2:
             st.markdown("##### Tier Distribution")
@@ -260,4 +260,4 @@ class SignalHistory:
                 showlegend=False
             )
             
-            st.plotly_chart(fig_tier, use_container_width=True)
+            st.plotly_chart(fig_tier, width='stretch')
