@@ -1,0 +1,100 @@
+此專案為 Python 為主、疑似 Streamlit 前端（.streamlit/ + frontend/）、自定後端（backend/）、可參數化設定（config/、MODEL_PARAMETERS.md）、入口 main.py、並附 Replit 部署入口。倉庫結構可見但檔案內容頁面未載入，以下基於可見結構與量化交易/即時行情系統實務給出「專項精準」優化清單與落地做法。檔案/資料夾名稱與存在性可核對。 ￼
+
+目標
+
+將此 Binance 專案升級為：
+	1.	穩定、可回放、可擴充的資料流與存儲層
+	2.	低延遲 UI 與可驗證的交易研究介面
+	3.	透明、可重現的模型訓練/推論與參數管理
+	4.	一鍵化部署與監控
+
+主方案（逐模組精準建議）
+
+介面設計（frontend/、.streamlit/）
+	•	交互分頁：首頁=概觀儀表板；行情流/深度流；策略研究；回測結果；交易日誌。用狀態列顯示 WS 延遲、丟包率、時鐘漂移。
+	•	關鍵圖層：
+	•	L1/L2 延遲熱圖（推流→接收毫秒級）
+	•	逐筆/委託簿失真指標（spread、order-book imbalance、top-of-book churn）
+	•	風險儀表（倉位、VAR、槓桿、保證金使用率）
+	•	控制面板：策略選擇器、超參旋鈕、回測區間、交易成本模板。
+	•	最佳化：前端只拉聚合後資料，原始逐筆改由後端聚合再下發；長圖使用增量繪製。
+
+（目錄存在依據：.streamlit/、frontend/ 條目可見。 ￼）
+
+後端/資料層（backend/）
+	•	資料攝取：Binance WebSocket 多路併發，25 symbols/連線，二進位流+permessage-deflate，20ms 微批；自動退避 0.5→8s；心跳 5s。
+	•	時間治理：三時間戳 exchange_ts / ingest_ts / infer_ts，EWMA 漂移校正，>100ms 觸發降級旗標。
+	•	品質稽核：lastUpdateId 审核與 gap 檢測（>0.2%/min 重建快照）。
+	•	快取：Redis 熱點 200ms TTL（BTC/ETH），快照 SETEX 3-10s，符號→整數 ID 映射。
+	•	長期儲存：ClickHouse MergeTree，PARTITION BY toDate(ts)，ORDER BY (symbol, ts)，1s/1m 物化視圖，ZSTD(6)。
+	•	重放與回測：以 parquet 分區（symbol/date/hour）導出，支援「同日同刻」重放。
+
+（backend/ 目錄可見。 ￼）
+
+設定/參數（config/、MODEL_PARAMETERS.md、pyproject.toml）
+	•	參數管理：用 Pydantic Settings 或 Hydra 管理：
+	•	data.ingest: 批大小、微批 ms、重連退避、心跳
+	•	feature: 視窗長度、標準化方法
+	•	model: 類型、維度、dropout、學習率、scheduler、seed
+	•	risk: 交易成本、滑點模型、槓桿上限、停止交易條件
+	•	多環境：config/{dev,prod}.yaml + .env（API keys 不進 repo）。
+	•	可追溯：MODEL_PARAMETERS.md 與 uv.lock/pyproject.toml 綁定訓練 run-id。
+
+（檔案存在依據：MODEL_PARAMETERS.md、pyproject.toml、uv.lock 條目可見。 ￼）
+
+模型設計與參數
+	•	訊號類型：
+	•	微結構：order-book imbalance、queue imbalances、cancel/new ratio、trade sign、VWAP 距離、micro-trend。
+	•	制度型：資金費率、開合倉節律、清算密度熱點（若有 perpetual）。
+	•	模型家族：
+	•	短線：Temporal CNN / Dilated 1D-Conv 或因果 Transformer（小型、因果 mask），輸入=多視窗特徵（50ms/250ms/1s）疊加。
+	•	中線：LSTM/GRU + 事件嵌入（撮合事件序列）。
+	•	解耦：分類器預測方向 p↑，回歸器預測條件期望 R↑，兩者合成 position sizing。
+	•	關鍵超參（初值範圍）：
+	•	窗口長度 256-2048 ticks；隱層 64-256；dropout 0.05-0.2；LR 1e-4~3e-4；weight decay 1e-5；warmup 2-5% steps；Cosine decay。
+	•	早停 5-10 個 eval 週期；混合精度 fp16。
+	•	損失/標註：
+	•	方向=FocalLoss（解 class imbalance）
+	•	報酬=Huber + 風險懲罰（超過滑點與費率門檻時加罰）
+	•	標註用「未來 K 步移動方向/幅度」與交易成本淨後報酬。
+
+Data（收集、特徵、標準化）
+	•	資料字典：trades、depth、funding、klines，明確欄位、頻率、主鍵（symbol, ts, seq）。
+	•	標準化：(x_t - median_lookback)/mad 或 rank-norm，避免極端值污染。
+	•	滑點模型：依當下深度與下單量模擬沖擊成本，校正回測樂觀偏誤。
+	•	冷啟：缺資料期間策略自動降風險或暫停。
+
+回測/執行（Execution）
+	•	撮合器：事件驅動撮合，價量優先，支援市價/限價/冰山；手續費與資金費率。
+	•	延遲注入：推論延遲與下單延遲采樣注入回測。
+	•	風控：金字塔與降槓桿規則、最大連虧 N、回撤>R% 全停。
+
+架構優化
+	•	分層：ingest → validate → enrich → store → serve → research → backtest → exec。
+	•	併發模型：asyncio + uvloop；CPU 親和與零拷貝解析（orjson）。
+	•	可觀測：Prometheus 指標：ingest_lag_ms、ws_gap_ratio、backfill_qps、model_infer_p95、trade_pnl、max_dd。Grafana dashboard。
+	•	部署：uv + pyproject.toml 鎖定；Docker 多服務；.env 授權；Replit/雲端只跑 demo，不含私鑰。
+（Replit 連結存在：頁面顯示 replit.com/@M116cj/BinanceRailway。 ￼）
+
+替代路徑
+	•	無資料庫輕量版：本地 Parquet + DuckDB，日內研究足夠，降運維。
+	•	全託管：Kafka（ingest）→ Flink（處理）→ BigQuery（存）→ Looker（報表）。
+	•	純事件驅動 RL：以撮合事件作 state，PPO/IMPALA，僅在研究環境使用。
+
+其他視角
+	•	治理：所有訓練/回測產物加 SHA 與參數快照；MODEL_PARAMETERS.md 對應 run-id。
+	•	合規：API 金鑰、交易許可、KYC、IP 白名單。
+	•	風險：交易量低標的自動降權或禁用；劇烈波動啟動「熔斷」策略。
+
+測試/驗證
+	•	單元/整合：
+	•	WS 模擬器：重播一天資料驗證丟包 <1%，延遲 p95 <300ms。
+	•	回測再現性：同 seed、同資料片段，PNL 漂移 <0.5%。
+	•	線上健康檢查：
+	•	ingest_lag_ms > 1000 → 降級；gap_ratio > 0.2%/min → 觸發快照重建。
+	•	統計檢定：
+	•	頻段分層（平盤/趨勢/高波動）做收益差異檢定；實際成本對沖盈虧。
+
+參考（可查核點）
+	•	倉庫檔案/資料夾存在性：.streamlit/、frontend/、backend/、config/、MODEL_PARAMETERS.md、main.py、pyproject.toml、uv.lock、final_state.png、probability_analysis_fullpage.png。 ￼
+	•	Replit 入口鏈結存在。 
