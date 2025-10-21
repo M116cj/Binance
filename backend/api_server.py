@@ -6,11 +6,15 @@ Demo mode with mock data - doesn't require Redis/ClickHouse.
 import time
 import logging
 import numpy as np
-from typing import Dict, Any, Optional
+import uuid
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 import uvicorn
+
+from backend.database import db_manager, get_db, ModelVersion, Signal, Prediction
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,6 +29,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    logger.info("Initializing database...")
+    db_manager.initialize()
+    
+    # Create default model version if not exists
+    with db_manager.get_session() as db:
+        existing_model = db.query(ModelVersion).filter(ModelVersion.version == "1.0.0").first()
+        if not existing_model:
+            default_model = ModelVersion(
+                version="1.0.0",
+                model_type="lightgbm_demo",
+                is_active=True,
+                config={"demo": True, "focal_gamma": 1.5},
+                metrics={"pr_auc": 0.72, "hit_at_top_k": 0.65},
+                calibration_method="isotonic",
+                calibration_ece=0.04,
+                deployed_at=datetime.utcnow(),
+                deployed_by="system"
+            )
+            db.add(default_model)
+            db.commit()
+            logger.info("Created default model version 1.0.0")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Close database connections"""
+    db_manager.close()
+
 def generate_mock_time_series(days: int, start_value: float = 0.0) -> Dict:
     """Generate mock time series data"""
     dates = [(datetime.now() - timedelta(days=days-i)).isoformat() for i in range(days)]
@@ -33,6 +67,66 @@ def generate_mock_time_series(days: int, start_value: float = 0.0) -> Dict:
         'dates': dates,
         'cumulative_returns': cumulative_returns
     }
+
+def save_signal_to_db(
+    db: Session,
+    symbol: str,
+    horizon_min: int,
+    decision: str,
+    tier: str,
+    p_up: float,
+    expected_return: float,
+    estimated_cost: float,
+    net_utility: float,
+    tau: float,
+    kappa: float,
+    theta_up: float,
+    theta_dn: float,
+    features_top5: Dict,
+    quality_flags: List,
+    sla_latency_ms: float,
+    regime: str = "normal",
+    volatility: float = 0.02
+) -> Signal:
+    """Save a generated signal to the database"""
+    signal_id = f"{symbol}_{horizon_min}m_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
+    
+    now = datetime.utcnow()
+    
+    signal = Signal(
+        signal_id=signal_id,
+        exchange_time=now - timedelta(milliseconds=np.random.uniform(50, 200)),
+        ingest_time=now - timedelta(milliseconds=np.random.uniform(20, 100)),
+        infer_time=now,
+        symbol=symbol,
+        horizon_min=horizon_min,
+        decision=decision,
+        tier=tier,
+        p_up=p_up,
+        p_up_ci_low=p_up - 0.05,
+        p_up_ci_high=p_up + 0.05,
+        expected_return=expected_return,
+        estimated_cost=estimated_cost,
+        net_utility=net_utility,
+        tau_threshold=tau,
+        kappa_threshold=kappa,
+        theta_up=theta_up,
+        theta_dn=theta_dn,
+        regime=regime,
+        volatility=volatility,
+        features_top5=features_top5,
+        quality_flags=quality_flags,
+        sla_latency_ms=sla_latency_ms,
+        model_version="1.0.0",
+        feature_version="1.0.0",
+        cost_model_version="v1.2.0"
+    )
+    
+    db.add(signal)
+    db.commit()
+    db.refresh(signal)
+    
+    return signal
 
 @app.get("/health")
 async def health_check():
@@ -50,7 +144,8 @@ async def get_realtime_signal_card(
     theta_up: float = Query(0.006, description="Up threshold"),
     theta_dn: float = Query(0.004, description="Down threshold"),
     tau: float = Query(0.75, description="Probability threshold"),
-    kappa: float = Query(1.20, description="Utility threshold")
+    kappa: float = Query(1.20, description="Utility threshold"),
+    db: Session = Depends(get_db)
 ):
     """Report 1: Real-time Signal Card"""
     p_up_5 = np.random.uniform(0.55, 0.85)
@@ -63,6 +158,40 @@ async def get_realtime_signal_card(
     
     decision_action = "LONG" if p_up_5 > tau and net_utility > kappa else "WAIT"
     signal_tier = "A" if p_up_5 > 0.75 and net_utility > 1.2 else "B" if p_up_5 > 0.65 else "none"
+    
+    features_top5 = {
+        'qi_1': np.random.uniform(-0.2, 0.3),
+        'ofi_10': np.random.uniform(-0.15, 0.25),
+        'microprice_dev': np.random.uniform(-0.1, 0.2),
+        'rv_ratio': np.random.uniform(-0.15, 0.2),
+        'depth_slope_bid': np.random.uniform(-0.1, 0.15)
+    }
+    
+    sla_latency = np.random.uniform(50, 200)
+    
+    # Save signal to database (5min horizon)
+    if decision_action != "WAIT":
+        try:
+            save_signal_to_db(
+                db=db,
+                symbol=symbol,
+                horizon_min=5,
+                decision=decision_action,
+                tier=signal_tier,
+                p_up=p_up_5,
+                expected_return=expected_return,
+                estimated_cost=estimated_cost,
+                net_utility=net_utility,
+                tau=tau,
+                kappa=kappa,
+                theta_up=theta_up,
+                theta_dn=theta_dn,
+                features_top5=features_top5,
+                quality_flags=[],
+                sla_latency_ms=sla_latency
+            )
+        except Exception as e:
+            logger.error(f"Failed to save signal: {e}")
     
     return {
         'symbol': symbol,
@@ -84,15 +213,9 @@ async def get_realtime_signal_card(
             'theta_up': theta_up,
             'theta_dn': theta_dn
         },
-        'features_top5': {
-            'qi_1': np.random.uniform(-0.2, 0.3),
-            'ofi_10': np.random.uniform(-0.15, 0.25),
-            'microprice_dev': np.random.uniform(-0.1, 0.2),
-            'rv_ratio': np.random.uniform(-0.15, 0.2),
-            'depth_slope_bid': np.random.uniform(-0.1, 0.15)
-        },
+        'features_top5': features_top5,
         'quality_flags': [],
-        'sla_latency_ms': np.random.uniform(50, 200),
+        'sla_latency_ms': sla_latency,
         'model_version': '1.0.0',
         'feature_version': '1.0.0',
         'cost_model': 'v1.2.0'
@@ -339,6 +462,162 @@ async def get_attribution_comparison(
             'true_negatives': np.random.randint(100, 200),
             'false_negatives': np.random.randint(15, 50)
         }
+    }
+
+@app.get("/signals")
+async def get_recent_signals(
+    symbol: Optional[str] = Query(None, description="Filter by symbol"),
+    tier: Optional[str] = Query(None, description="Filter by tier (A, B)"),
+    limit: int = Query(20, description="Number of signals to return"),
+    db: Session = Depends(get_db)
+):
+    """Get recent trading signals"""
+    query = db.query(Signal).order_by(Signal.created_at.desc())
+    
+    if symbol:
+        query = query.filter(Signal.symbol == symbol)
+    if tier and tier != "none":
+        query = query.filter(Signal.tier == tier)
+    
+    signals = query.limit(limit).all()
+    
+    return {
+        "count": len(signals),
+        "signals": [
+            {
+                "signal_id": s.signal_id,
+                "created_at": s.created_at.isoformat(),
+                "symbol": s.symbol,
+                "horizon_min": s.horizon_min,
+                "decision": s.decision,
+                "tier": s.tier,
+                "p_up": s.p_up,
+                "expected_return": s.expected_return,
+                "net_utility": s.net_utility,
+                "sla_latency_ms": s.sla_latency_ms,
+                "model_version": s.model_version
+            }
+            for s in signals
+        ]
+    }
+
+@app.get("/signals/history")
+async def get_signal_history(
+    symbol: str = Query(..., description="Trading symbol"),
+    hours: int = Query(24, description="Hours of history to retrieve"),
+    db: Session = Depends(get_db)
+):
+    """Get signal history for a specific symbol"""
+    cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+    
+    signals = db.query(Signal).filter(
+        Signal.symbol == symbol,
+        Signal.created_at >= cutoff_time
+    ).order_by(Signal.created_at.asc()).all()
+    
+    # Calculate stats
+    total_signals = len(signals)
+    a_tier_count = sum(1 for s in signals if s.tier == 'A')
+    b_tier_count = sum(1 for s in signals if s.tier == 'B')
+    long_count = sum(1 for s in signals if s.decision == 'LONG')
+    
+    avg_utility = np.mean([s.net_utility for s in signals]) if signals else 0
+    avg_latency = np.mean([s.sla_latency_ms for s in signals]) if signals else 0
+    
+    return {
+        "symbol": symbol,
+        "period_hours": hours,
+        "summary": {
+            "total_signals": total_signals,
+            "a_tier_signals": a_tier_count,
+            "b_tier_signals": b_tier_count,
+            "long_signals": long_count,
+            "avg_utility": float(avg_utility),
+            "avg_latency_ms": float(avg_latency)
+        },
+        "signals": [
+            {
+                "time": s.created_at.isoformat(),
+                "decision": s.decision,
+                "tier": s.tier,
+                "p_up": s.p_up,
+                "utility": s.net_utility,
+                "latency_ms": s.sla_latency_ms
+            }
+            for s in signals
+        ]
+    }
+
+@app.get("/signals/stats")
+async def get_signal_stats(
+    db: Session = Depends(get_db)
+):
+    """Get overall signal statistics"""
+    # Get signals from last 24 hours
+    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    recent_signals = db.query(Signal).filter(Signal.created_at >= cutoff_time).all()
+    
+    # Calculate statistics by symbol
+    symbols_stats = {}
+    for signal in recent_signals:
+        if signal.symbol not in symbols_stats:
+            symbols_stats[signal.symbol] = {
+                'total': 0,
+                'a_tier': 0,
+                'b_tier': 0,
+                'long': 0,
+                'utilities': [],
+                'latencies': []
+            }
+        
+        stats = symbols_stats[signal.symbol]
+        stats['total'] += 1
+        if signal.tier == 'A':
+            stats['a_tier'] += 1
+        elif signal.tier == 'B':
+            stats['b_tier'] += 1
+        if signal.decision == 'LONG':
+            stats['long'] += 1
+        stats['utilities'].append(signal.net_utility)
+        stats['latencies'].append(signal.sla_latency_ms)
+    
+    # Format results
+    results = {}
+    for symbol, stats in symbols_stats.items():
+        results[symbol] = {
+            'total_signals': stats['total'],
+            'a_tier_count': stats['a_tier'],
+            'b_tier_count': stats['b_tier'],
+            'long_count': stats['long'],
+            'avg_utility': float(np.mean(stats['utilities'])) if stats['utilities'] else 0,
+            'avg_latency_ms': float(np.mean(stats['latencies'])) if stats['latencies'] else 0
+        }
+    
+    return {
+        "period": "last_24_hours",
+        "total_signals": len(recent_signals),
+        "by_symbol": results
+    }
+
+@app.get("/models")
+async def get_model_versions(
+    db: Session = Depends(get_db)
+):
+    """Get all model versions"""
+    models = db.query(ModelVersion).order_by(ModelVersion.created_at.desc()).all()
+    
+    return {
+        "models": [
+            {
+                "version": m.version,
+                "model_type": m.model_type,
+                "is_active": m.is_active,
+                "created_at": m.created_at.isoformat(),
+                "metrics": m.metrics,
+                "calibration_ece": m.calibration_ece
+            }
+            for m in models
+        ]
     }
 
 if __name__ == "__main__":
