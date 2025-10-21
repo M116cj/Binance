@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 import uvicorn
 
 from backend.database import db_manager, get_db, ModelVersion, Signal, Prediction
+from backend.export_utils import signals_to_protobuf_batch, signals_to_jsonl
+from fastapi.responses import Response
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -619,6 +621,117 @@ async def get_model_versions(
             for m in models
         ]
     }
+
+@app.get("/export/protobuf")
+async def export_signals_protobuf(
+    symbol: Optional[str] = None,
+    decision: Optional[str] = None,
+    tier: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    limit: int = Query(1000, le=10000),
+    db: Session = Depends(get_db)
+):
+    """Export signals in binary Protobuf format for downstream trading bots.
+    
+    Args:
+        symbol: Filter by symbol (e.g., BTCUSDT)
+        decision: Filter by decision (LONG, SHORT, WAIT)
+        tier: Filter by tier (A, B, C)
+        start_time: ISO format start time
+        end_time: ISO format end time
+        limit: Maximum number of signals (max 10000)
+    
+    Returns:
+        Binary Protobuf serialized SignalBatch
+    """
+    query = db.query(Signal)
+    
+    # Apply filters
+    if symbol:
+        query = query.filter(Signal.symbol == symbol)
+    if decision:
+        query = query.filter(Signal.decision == decision)
+    if tier:
+        query = query.filter(Signal.tier == tier)
+    if start_time:
+        query = query.filter(Signal.created_at >= datetime.fromisoformat(start_time))
+    if end_time:
+        query = query.filter(Signal.created_at <= datetime.fromisoformat(end_time))
+    
+    # Order by timestamp and limit
+    signals = query.order_by(Signal.created_at.desc()).limit(limit).all()
+    
+    # Convert to Protobuf batch
+    export_id = f"pb_{int(datetime.utcnow().timestamp() * 1000)}"
+    pb_batch = signals_to_protobuf_batch(signals, export_id=export_id)
+    
+    # Serialize to binary
+    binary_data = pb_batch.SerializeToString()
+    
+    return Response(
+        content=binary_data,
+        media_type="application/x-protobuf",
+        headers={
+            "Content-Disposition": f"attachment; filename=signals_{export_id}.pb",
+            "X-Export-Count": str(len(signals)),
+            "X-Export-ID": export_id
+        }
+    )
+
+@app.get("/export/jsonl")
+async def export_signals_jsonl(
+    symbol: Optional[str] = None,
+    decision: Optional[str] = None,
+    tier: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    limit: int = Query(1000, le=10000),
+    db: Session = Depends(get_db)
+):
+    """Export signals in JSONL format (newline-delimited JSON) for downstream systems.
+    
+    Args:
+        symbol: Filter by symbol (e.g., BTCUSDT)
+        decision: Filter by decision (LONG, SHORT, WAIT)
+        tier: Filter by tier (A, B, C)
+        start_time: ISO format start time
+        end_time: ISO format end time
+        limit: Maximum number of signals (max 10000)
+    
+    Returns:
+        JSONL text file (one JSON object per line)
+    """
+    query = db.query(Signal)
+    
+    # Apply filters
+    if symbol:
+        query = query.filter(Signal.symbol == symbol)
+    if decision:
+        query = query.filter(Signal.decision == decision)
+    if tier:
+        query = query.filter(Signal.tier == tier)
+    if start_time:
+        query = query.filter(Signal.created_at >= datetime.fromisoformat(start_time))
+    if end_time:
+        query = query.filter(Signal.created_at <= datetime.fromisoformat(end_time))
+    
+    # Order by timestamp and limit
+    signals = query.order_by(Signal.created_at.desc()).limit(limit).all()
+    
+    # Convert to JSONL
+    export_id = f"jsonl_{int(datetime.utcnow().timestamp() * 1000)}"
+    jsonl_data = signals_to_jsonl(signals)
+    
+    return Response(
+        content=jsonl_data,
+        media_type="application/x-ndjson",
+        headers={
+            "Content-Disposition": f"attachment; filename=signals_{export_id}.jsonl",
+            "X-Export-Count": str(len(signals)),
+            "X-Export-ID": export_id
+        }
+    )
 
 if __name__ == "__main__":
     logger.info("Starting Crypto Surge Prediction API Server (Demo Mode)")

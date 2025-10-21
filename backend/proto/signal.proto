@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package crypto_surge;
+
+// Trading signal message optimized for low-latency consumption
+message TradingSignal {
+  // Core identification
+  string symbol = 1;
+  int64 timestamp_ms = 2;
+  string signal_id = 3;
+  
+  // Price and probabilities
+  double current_price = 4;
+  Probabilities probabilities = 5;
+  
+  // Decision and metadata
+  string decision = 6;  // LONG, SHORT, WAIT
+  string tier = 7;      // A, B, C
+  double utility = 8;
+  double expected_return = 9;
+  double estimated_cost = 10;
+  
+  // Model metadata
+  string model_version = 11;
+  string feature_version = 12;
+  double sla_latency_ms = 13;
+  
+  // Thresholds used
+  Thresholds thresholds = 14;
+  
+  // Top features (for attribution)
+  map<string, double> top_features = 15;
+  
+  // Quality indicators
+  repeated string quality_flags = 16;
+}
+
+message Probabilities {
+  HorizonProb prob_5m = 1;
+  HorizonProb prob_10m = 2;
+  HorizonProb prob_30m = 3;
+}
+
+message HorizonProb {
+  double value = 1;
+  double ci_low = 2;
+  double ci_high = 3;
+}
+
+message Thresholds {
+  double tau = 1;
+  double kappa = 2;
+  double theta_up = 3;
+  double theta_dn = 4;
+}
+
+// Batch export message
+message SignalBatch {
+  repeated TradingSignal signals = 1;
+  int64 export_timestamp_ms = 2;
+  string export_id = 3;
+  int32 total_count = 4;
+}

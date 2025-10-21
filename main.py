@@ -19,6 +19,8 @@ from frontend.components.cost_capacity import CostCapacity
 from frontend.components.backtest_performance import BacktestPerformance
 from frontend.components.calibration_analysis import CalibrationAnalysis
 from frontend.components.attribution_comparison import AttributionComparison
+from frontend.components.admin_panel import AdminPanel
+from frontend.components.signal_history import SignalHistory
 
 # Configuration
 BACKEND_HOST = os.getenv("BACKEND_HOST", "localhost")
@@ -35,6 +37,8 @@ class CryptoSurgePredictionDashboard:
         self.backtest_performance = BacktestPerformance()
         self.calibration_analysis = CalibrationAnalysis()
         self.attribution_comparison = AttributionComparison()
+        self.admin_panel = AdminPanel()
+        self.signal_history = SignalHistory()
         
     def initialize_session_state(self):
         """Initialize Streamlit session state variables"""
@@ -265,6 +269,28 @@ class CryptoSurgePredictionDashboard:
         else:
             st.error("Unable to load attribution comparison data")
     
+    def render_admin_panel(self):
+        """Admin panel for model management and system configuration"""
+        st.markdown("## ⚙️ Admin Panel & System Configuration")
+        
+        # Fetch models data
+        models_data = self.fetch_data("models")
+        
+        # Fetch signal statistics
+        signals_stats = self.fetch_data("signals/stats")
+        
+        # Render admin panel
+        self.admin_panel.render(models_data, signals_stats)
+    
+    def render_signal_history(self):
+        """Signal history view with past predictions"""
+        st.markdown("## 📜 Signal History")
+        
+        # Get filter values from the component
+        # These will be set by the component's render method
+        # We need to fetch data based on filters, so we'll pass the fetch function
+        self.signal_history.render(self.fetch_data)
+    
     def run(self):
         """Main application runner"""
         st.set_page_config(
@@ -291,7 +317,9 @@ class CryptoSurgePredictionDashboard:
             "💰 Cost & Capacity",
             "📊 Backtest Performance",
             "🎯 Calibration Analysis",
-            "🔍 Attribution & Comparison"
+            "🔍 Attribution & Comparison",
+            "📜 Signal History",
+            "⚙️ Admin Panel"
         ])
         
         with tabs[0]:
@@ -314,6 +342,12 @@ class CryptoSurgePredictionDashboard:
             
         with tabs[6]:
             self.render_attribution_comparison()
+        
+        with tabs[7]:
+            self.render_signal_history()
+        
+        with tabs[8]:
+            self.render_admin_panel()
 
 def main():
     dashboard = CryptoSurgePredictionDashboard()
