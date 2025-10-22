@@ -8,6 +8,29 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### 2025-10-22: 代码质量修复 & 策略快速切换功能上线
+1. **代码质量全面提升**（LSP诊断清零）:
+   - 修复FastAPI弃用警告：@app.on_event() → lifespan context manager
+   - 修复SQLAlchemy类型提示问题（backend/api_server.py）
+   - 添加完整类型注解：Optional[Dict]、List[Signal]等
+   - 清除孤立代码片段（shutdown_event残留）
+   - **最终结果：0 LSP错误，100%类型安全**
+
+2. **策略快速切换系统**（用户体验重大升级）:
+   - 实现三档策略预设（保守/平衡/激进），基于用户参数优化建议
+   - **保守型**：θ_up=0.6%, θ_dn=0.4%, τ=75%, κ=1.2x（高确定性交易）
+   - **平衡型**：θ_up=0.4%, θ_dn=0.3%, τ=65%, κ=1.0x（平衡收益风险）
+   - **激进型**：θ_up=0.2%, θ_dn=0.15%, τ=55%, κ=0.8x（高频高风险）
+   - 一键切换按钮UI（3列布局，图标+文字）
+   - 策略参数总览（4个关键指标2x2网格展示）
+   - 高级参数微调（可展开expander，保留专业用户手动调整能力）
+
+3. **代码架构优化**:
+   - 添加`STRATEGY_PRESETS`类常量（完整参数配置）
+   - 新增`apply_strategy_preset()`方法（一键应用预设）
+   - `current_strategy`状态跟踪（记住用户选择）
+   - 参数显示与调整分离（先展示总览，再允许微调）
+
 ### 2025-10-21: 全面系统优化 - 性能、架构与监控升级
 1. **修复所有技术警告**:
    - 清除Streamlit use_container_width弃用警告（47处替换为width参数）

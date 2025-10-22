@@ -28,6 +28,34 @@ BACKEND_PORT = os.getenv("BACKEND_PORT", "8000")
 BASE_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
 
 class CryptoSurgePredictionDashboard:
+    # 策略预设配置（基于用户参数优化建议）
+    STRATEGY_PRESETS = {
+        "🛡️ 保守型": {
+            "theta_up": 0.006,  # 0.6% (6bp)
+            "theta_dn": 0.004,  # 0.4%
+            "tau_threshold": 0.75,  # p_up > 75%
+            "kappa_threshold": 1.20,  # 收益 > 1.2倍成本
+            "description": "高确定性交易，安全第一",
+            "icon": "🛡️"
+        },
+        "⚖️ 平衡型": {
+            "theta_up": 0.004,  # 0.4% (4bp)
+            "theta_dn": 0.003,  # 0.3%
+            "tau_threshold": 0.65,  # p_up > 65%
+            "kappa_threshold": 1.00,  # 收益 > 1.0倍成本
+            "description": "平衡收益与风险",
+            "icon": "⚖️"
+        },
+        "🔥 激进型": {
+            "theta_up": 0.002,  # 0.2% (2bp)
+            "theta_dn": 0.0015,  # 0.15%
+            "tau_threshold": 0.55,  # p_up > 55%
+            "kappa_threshold": 0.80,  # 收益 > 0.8倍成本
+            "description": "更多交易机会，高风险高回报",
+            "icon": "🔥"
+        }
+    }
+    
     def __init__(self):
         self.client = httpx.Client(timeout=30.0)
         self.signal_card = SignalCard()
@@ -44,6 +72,8 @@ class CryptoSurgePredictionDashboard:
         """初始化Streamlit会话状态变量"""
         if 'selected_symbol' not in st.session_state:
             st.session_state.selected_symbol = 'BTCUSDT'
+        if 'current_strategy' not in st.session_state:
+            st.session_state.current_strategy = "🛡️ 保守型"  # 默认保守策略
         if 'theta_up' not in st.session_state:
             st.session_state.theta_up = 0.006  # 0.6%
         if 'theta_dn' not in st.session_state:
@@ -60,8 +90,34 @@ class CryptoSurgePredictionDashboard:
             st.session_state.last_update = time.time()
         if 'available_symbols' not in st.session_state:
             st.session_state.available_symbols = None
+    
+    def apply_strategy_preset(self, strategy_name: str):
+        """应用策略预设到session state"""
+        if strategy_name in self.STRATEGY_PRESETS:
+            preset = self.STRATEGY_PRESETS[strategy_name]
+            st.session_state.theta_up = preset['theta_up']
+            st.session_state.theta_dn = preset['theta_dn']
+            st.session_state.tau_threshold = preset['tau_threshold']
+            st.session_state.kappa_threshold = preset['kappa_threshold']
+            st.session_state.current_strategy = strategy_name
+    
+    def detect_current_strategy(self) -> str:
+        """检测当前参数匹配哪个预设策略，如果不匹配则返回"自定义"
+        
+        使用容差比较（0.0001）来处理浮点数精度问题
+        """
+        tolerance = 0.0001
+        
+        for strategy_name, preset in self.STRATEGY_PRESETS.items():
+            if (abs(st.session_state.theta_up - preset['theta_up']) < tolerance and
+                abs(st.session_state.theta_dn - preset['theta_dn']) < tolerance and
+                abs(st.session_state.tau_threshold - preset['tau_threshold']) < tolerance and
+                abs(st.session_state.kappa_threshold - preset['kappa_threshold']) < tolerance):
+                return strategy_name
+        
+        return "🔧 自定义"
             
-    def fetch_data(self, endpoint: str, params: Dict = None) -> Optional[Dict]:
+    def fetch_data(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Dict]:
         """从后端API获取数据，带错误处理"""
         try:
             response = self.client.get(f"{BASE_URL}/{endpoint}", params=params or {})
@@ -134,59 +190,93 @@ class CryptoSurgePredictionDashboard:
         
         st.session_state.selected_symbol = symbol_map[selected_display]
         
-        st.sidebar.markdown("### ⚙️ 交易参数设置")
-        st.sidebar.caption("设置涨跌幅度的判断标准")
+        # 策略快速切换（优先）
+        st.sidebar.markdown("### 🎯 策略快速切换")
+        st.sidebar.caption("一键应用推荐参数组合")
         
-        # 标记参数
-        st.session_state.theta_up = st.sidebar.number_input(
-            "📈 上涨判定线 (%)", 
-            min_value=0.1, 
-            max_value=2.0, 
-            value=st.session_state.theta_up * 100,
-            step=0.1,
-            format="%.1f",
-            help="价格上涨多少才算是\"涨\"？例如：0.6% 表示价格上涨0.6%以上才算真正上涨"
-        ) / 100
+        col1, col2, col3 = st.sidebar.columns(3)
         
-        st.session_state.theta_dn = st.sidebar.number_input(
-            "📉 下跌判定线 (%)", 
-            min_value=0.1, 
-            max_value=1.5, 
-            value=st.session_state.theta_dn * 100,
-            step=0.1,
-            format="%.1f",
-            help="价格下跌多少才算是\"跌\"？例如：0.4% 表示价格下跌0.4%以上才算真正下跌"
-        ) / 100
+        with col1:
+            if st.button("🛡️\n保守", use_container_width=True, help="高确定性，安全第一"):
+                self.apply_strategy_preset("🛡️ 保守型")
+                st.rerun()
         
-        # 决策阈值
-        st.sidebar.markdown("### 🎯 交易策略选择")
-        st.sidebar.caption("选择你的风险偏好")
+        with col2:
+            if st.button("⚖️\n平衡", use_container_width=True, help="平衡收益与风险"):
+                self.apply_strategy_preset("⚖️ 平衡型")
+                st.rerun()
         
-        tier = st.sidebar.radio(
-            "策略类型", 
-            ["🛡️ 保守型", "⚖️ 平衡型", "🔥 激进型"],
-            help="保守型：高确定性但机会少 | 平衡型：兼顾收益和风险 | 激进型：更多机会但风险大"
-        )
+        with col3:
+            if st.button("🔥\n激进", use_container_width=True, help="高回报高风险"):
+                self.apply_strategy_preset("🔥 激进型")
+                st.rerun()
         
-        if tier == "🛡️ 保守型":
-            st.session_state.tau_threshold = 0.75
-            st.session_state.kappa_threshold = 1.20
-            st.sidebar.info("📊 保守策略：只在高把握时交易，安全第一")
-        elif tier == "⚖️ 平衡型":
-            st.session_state.tau_threshold = 0.65
-            st.session_state.kappa_threshold = 1.00
-            st.sidebar.info("📊 平衡策略：追求收益与风险的平衡")
-        else:  # 激进型
-            st.session_state.tau_threshold = 0.55
-            st.session_state.kappa_threshold = 0.80
-            st.sidebar.warning("📊 激进策略：更多交易机会，但风险较高")
+        # 动态检测并显示当前策略
+        detected_strategy = self.detect_current_strategy()
         
-        # 显示当前阈值（用简单语言）
-        confidence_pct = int(st.session_state.tau_threshold * 100)
-        st.sidebar.metric("信心度要求", f"{confidence_pct}%", 
-                         help="只有当系统有这么高的把握时才会给出信号")
-        st.sidebar.metric("收益要求", f"{st.session_state.kappa_threshold:.1f}倍成本",
-                         help="预期收益至少要是交易成本的这么多倍")
+        if detected_strategy == "🔧 自定义":
+            st.sidebar.warning(f"**当前策略：** {detected_strategy}\n\n参数已手动调整，偏离预设配置\n\n💡 点击上方按钮可恢复到预设策略")
+        else:
+            current_preset = self.STRATEGY_PRESETS[detected_strategy]
+            st.sidebar.info(f"**当前策略：** {detected_strategy}\n\n{current_preset['description']}")
+        
+        # 显示完整参数（4个关键指标）
+        st.sidebar.markdown("### 📊 策略参数总览")
+        col_a, col_b = st.sidebar.columns(2)
+        with col_a:
+            st.metric("上涨线", f"{st.session_state.theta_up*100:.2f}%")
+            st.metric("信心度", f"{int(st.session_state.tau_threshold*100)}%")
+        with col_b:
+            st.metric("下跌线", f"{st.session_state.theta_dn*100:.2f}%")
+            st.metric("收益倍数", f"{st.session_state.kappa_threshold:.1f}x")
+        
+        # 高级参数微调（可展开）
+        with st.sidebar.expander("🔧 高级参数微调", expanded=False):
+            st.caption("手动调整策略参数（专业用户）")
+            
+            st.session_state.theta_up = st.number_input(
+                "📈 上涨判定线 (%)", 
+                min_value=0.1, 
+                max_value=2.0, 
+                value=st.session_state.theta_up * 100,
+                step=0.05,
+                format="%.2f",
+                help="价格上涨多少才算真正上涨",
+                key="theta_up_input"
+            ) / 100
+            
+            st.session_state.theta_dn = st.number_input(
+                "📉 下跌判定线 (%)", 
+                min_value=0.1, 
+                max_value=1.5, 
+                value=st.session_state.theta_dn * 100,
+                step=0.05,
+                format="%.2f",
+                help="价格下跌多少才算真正下跌",
+                key="theta_dn_input"
+            ) / 100
+            
+            st.session_state.tau_threshold = st.slider(
+                "🎯 信心度阈值",
+                min_value=0.5,
+                max_value=0.9,
+                value=st.session_state.tau_threshold,
+                step=0.05,
+                help="预测概率至少要达到这个值",
+                key="tau_input"
+            )
+            
+            st.session_state.kappa_threshold = st.slider(
+                "💰 收益成本比阈值",
+                min_value=0.5,
+                max_value=2.0,
+                value=st.session_state.kappa_threshold,
+                step=0.1,
+                help="预期收益与成本的比例",
+                key="kappa_input"
+            )
+            
+            st.warning("⚠️ 修改参数后会覆盖策略预设")
         
         # 自动刷新
         st.sidebar.markdown("---")
