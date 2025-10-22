@@ -883,6 +883,137 @@ async def export_signals_jsonl(
         }
     )
 
+@app.get("/reports/batch")
+@cache_response(global_cache, ttl=10.0, key_prefix="batch")
+async def get_batch_reports(
+    symbol: str = Query("BTCUSDT", description="Trading symbol"),
+    theta_up: float = Query(0.008, description="Up threshold (optimized)"),
+    theta_dn: float = Query(0.0056, description="Down threshold (optimized)"),
+    tau: float = Query(0.75, description="Probability threshold"),
+    kappa: float = Query(1.20, description="Utility threshold"),
+    days_back: int = Query(20, description="Days to look back"),
+    signals_limit: int = Query(1000, description="Max signals to fetch"),
+    db: Session = Depends(get_db)
+):
+    """批处理端点：一次性返回监控仪表板所需的所有数据
+    
+    减少多个API往返，提升前端性能
+    
+    返回:
+        - signals_stats: 信号统计
+        - models: 模型列表
+        - health: 健康状态
+        - recent_signals: 最近的信号
+        - backtest: 回测结果
+    """
+    try:
+        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        
+        # 1. 信号统计（完整契约匹配/signals/stats）
+        from sqlalchemy import case
+        
+        stats_query = db.query(
+            Signal.symbol,
+            func.count(Signal.id).label('total'),
+            func.sum(case((Signal.tier == 'A', 1), else_=0)).label('a_tier'),
+            func.sum(case((Signal.tier == 'B', 1), else_=0)).label('b_tier'),
+            func.sum(case((Signal.decision == 'LONG', 1), else_=0)).label('long_count'),
+            func.avg(Signal.net_utility).label('avg_utility'),
+            func.avg(Signal.sla_latency_ms).label('avg_latency')
+        ).filter(
+            Signal.created_at >= cutoff_time
+        ).group_by(Signal.symbol).all()
+        
+        total_signals = db.query(func.count(Signal.id)).filter(
+            Signal.created_at >= cutoff_time
+        ).scalar()
+        
+        by_symbol_stats = {}
+        for row in stats_query:
+            by_symbol_stats[row.symbol] = {
+                'total_signals': row.total,
+                'a_tier_count': row.a_tier,
+                'b_tier_count': row.b_tier,
+                'long_count': row.long_count,
+                'avg_utility': float(row.avg_utility) if row.avg_utility else 0,
+                'avg_latency_ms': float(row.avg_latency) if row.avg_latency else 0
+            }
+        
+        signals_stats = {
+            'period': 'last_24_hours',
+            'total_signals': total_signals or 0,
+            'by_symbol': by_symbol_stats
+        }
+        
+        # 2. 模型列表（完整契约匹配/models）
+        models = db.query(ModelVersion).order_by(ModelVersion.created_at.desc()).all()
+        models_data = {
+            'models': [
+                {
+                    'version': m.version,
+                    'model_type': m.model_type,
+                    'is_active': m.is_active,
+                    'created_at': m.created_at.isoformat(),
+                    'metrics': m.metrics,
+                    'calibration_ece': m.calibration_ece
+                }
+                for m in models
+            ]
+        }
+        
+        # 3. 健康状态
+        health_data = {
+            'status': 'healthy',
+            'timestamp': int(time.time() * 1000),
+            'exchange_lag_s': np.random.uniform(0.1, 1.5),
+            'mode': 'demo'
+        }
+        
+        # 4. 最近的信号
+        signals = db.query(Signal).order_by(Signal.created_at.desc()).limit(signals_limit).all()
+        recent_signals_data = [{
+            'signal_id': s.signal_id,
+            'symbol': s.symbol,
+            'tier': s.tier,
+            'decision': s.decision,
+            'p_up': s.p_up,
+            'sla_latency_ms': s.sla_latency_ms,
+            'created_at': s.created_at.isoformat()
+        } for s in signals]
+        
+        # 5. 回测数据（模拟）
+        backtest_data = {
+            'sharpe_ratio': np.random.uniform(1.5, 2.5),
+            'max_drawdown': np.random.uniform(0.08, 0.15),
+            'win_rate': np.random.uniform(0.6, 0.75),
+            'total_return': np.random.uniform(0.15, 0.35),
+            'num_trades': np.random.randint(50, 150)
+        }
+        
+        return {
+            'signals_stats': signals_stats,  # 完整的/signals/stats契约
+            'models': models_data,  # 完整的/models契约（包含"models"键）
+            'health': health_data,
+            'recent_signals': {
+                'signals': recent_signals_data,
+                'total': len(recent_signals_data)
+            },
+            'backtest': backtest_data,
+            'params': {
+                'symbol': symbol,
+                'theta_up': theta_up,
+                'theta_dn': theta_dn,
+                'tau': tau,
+                'kappa': kappa,
+                'days_back': days_back
+            },
+            'cached_at': int(time.time() * 1000)
+        }
+    except Exception as e:
+        logger.error(f"Error in batch reports: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate batch reports: {str(e)}")
+
+
 if __name__ == "__main__":
     logger.info("Starting Crypto Surge Prediction API Server (Demo Mode)")
     uvicorn.run(

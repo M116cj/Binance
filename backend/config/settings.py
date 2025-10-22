@@ -125,14 +125,6 @@ class RiskSettings(BaseSettings):
     tau_tier_b: float = Field(0.70, description="B级信号-概率阈值")
     kappa_tier_b: float = Field(1.10, description="B级信号-效用阈值")
     
-    # 向后兼容旧字段名（保留以防止代码破坏）
-    tau_conservative: float = Field(0.75, description="保守策略-概率阈值（等同于A级）")
-    kappa_conservative: float = Field(1.20, description="保守策略-效用阈值（等同于A级）")
-    tau_balanced: float = Field(0.70, description="平衡策略-概率阈值（等同于B级）")
-    kappa_balanced: float = Field(1.10, description="平衡策略-效用阈值（等同于B级）")
-    tau_aggressive: float = Field(0.70, description="激进策略-概率阈值（已废弃，使用tier_b）")
-    kappa_aggressive: float = Field(1.10, description="激进策略-效用阈值（已废弃，使用tier_b）")
-    
     model_config = SettingsConfigDict(env_prefix='RISK_')
 
 
@@ -160,6 +152,12 @@ class DatabaseSettings(BaseSettings):
 
 class APISettings(BaseSettings):
     """API服务配置"""
+    
+    # 运行模式
+    mode: Literal["demo", "production"] = Field(
+        "demo",
+        description="运行模式：demo使用模拟数据，production使用真实ONNX推理"
+    )
     
     # FastAPI
     api_host: str = Field("0.0.0.0", description="API主机")

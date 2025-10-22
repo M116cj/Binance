@@ -16,23 +16,27 @@ class MonitoringDashboard:
         
         st.markdown("### 📊 System Monitoring & SLA Tracking")
         
-        # 获取系统数据
-        signals_stats = fetch_data_fn("signals/stats", {})
-        models_data = fetch_data_fn("models", {})
-        health_data = fetch_data_fn("health", {})
-        
-        # 获取最近的信号以进行准确的百分位数计算
-        recent_signals = fetch_data_fn("signals", {'limit': 1000})
-        
-        # 获取回测数据以获取性能指标（使用优化后参数）
-        backtest_data = fetch_data_fn("reports/backtest", {
+        # 使用批处理端点一次性获取所有数据（优化：5个请求 → 1个请求）
+        batch_data = fetch_data_fn("reports/batch", {
             'symbol': 'BTCUSDT',
-            'theta_up': 0.008,  # 优化为0.8%
-            'theta_dn': 0.0056,  # 优化为0.56%
-            'tau': 0.75,  # A级阈值
-            'kappa': 1.20,  # A级阈值
-            'days_back': 20  # 优化为20天
+            'theta_up': 0.008,
+            'theta_dn': 0.0056,
+            'tau': 0.75,
+            'kappa': 1.20,
+            'days_back': 20,
+            'signals_limit': 1000
         })
+        
+        if not batch_data:
+            st.error("❌ 无法加载监控数据")
+            return
+        
+        # 解包批处理数据
+        signals_stats = batch_data.get('signals_stats')
+        models_data = batch_data.get('models', [])
+        health_data = batch_data.get('health')
+        recent_signals = batch_data.get('recent_signals')
+        backtest_data = batch_data.get('backtest')
         
         # SLA概览
         self._render_sla_overview(signals_stats, health_data, recent_signals)
