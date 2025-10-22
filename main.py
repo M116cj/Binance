@@ -82,6 +82,8 @@ class CryptoSurgePredictionDashboard:
             st.session_state.last_update = time.time()
         if 'available_symbols' not in st.session_state:
             st.session_state.available_symbols = None
+        if 'dark_mode' not in st.session_state:
+            st.session_state.dark_mode = True  # 默认TradingView深色模式
     
     def apply_strategy_preset(self, strategy_name: str):
         """应用策略预设到session state"""
@@ -147,22 +149,23 @@ class CryptoSurgePredictionDashboard:
         return fallback
     
     def render_sidebar(self):
-        """渲染控制侧边栏（iOS风格）"""
-        # iOS风格标题
-        st.sidebar.markdown("""
-        <div style='text-align: center; padding: 16px 0 8px 0;'>
-            <h1 style='font-size: 28px; margin: 0; font-weight: 700;'>🚀</h1>
-            <h2 style='font-size: 20px; margin: 8px 0 4px 0; font-weight: 600;'>加密货币预测</h2>
-            <p style='font-size: 13px; color: #8E8E93; margin: 0;'>智能涨跌预测系统</p>
+        """渲染控制侧边栏（TradingView风格）"""
+        # TradingView风格标题
+        title_color = "#D1D4DC" if st.session_state.dark_mode else "#000000"
+        st.sidebar.markdown(f"""
+        <div style='text-align: center; padding: 20px 0 12px 0;'>
+            <h1 style='font-size: 32px; margin: 0; font-weight: 700;'>📊</h1>
+            <h2 style='font-size: 22px; margin: 12px 0 0 0; font-weight: 600; letter-spacing: -0.5px; color: {title_color};'>加密货币预测</h2>
         </div>
         """, unsafe_allow_html=True)
-        st.sidebar.markdown("")
         
-        # 交易对选择 - 从后端动态加载
+        st.sidebar.divider()
+        
+        # 交易对选择 - 精简标签
         available_symbols = self.load_available_symbols()
         
         if not available_symbols:
-            st.sidebar.error("⚠️ 无法加载交易对列表")
+            st.sidebar.error("⚠️ 连接失败")
             return
         
         symbol_options = [s['displayName'] for s in available_symbols]
@@ -180,176 +183,151 @@ class CryptoSurgePredictionDashboard:
             default_index = 0
         
         selected_display = st.sidebar.selectbox(
-            "📊 选择交易对",
+            "交易对",
             symbol_options,
             index=default_index,
-            help=f"从币安{len(available_symbols)}个USDT交易对中选择"
+            label_visibility="collapsed"
         )
         
         st.session_state.selected_symbol = symbol_map[selected_display]
         
-        # 策略快速切换（iOS风格）
+        st.sidebar.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+        
+        # 策略快速切换 - 极简设计
         st.sidebar.markdown("""
-        <div style='background-color: #F9F9F9; padding: 12px; border-radius: 10px; margin: 16px 0;'>
-            <p style='font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #000000;'>🎯 信号等级</p>
-            <p style='font-size: 12px; color: #8E8E93; margin: 0;'>选择预测精度级别</p>
+        <div style='text-align: center; margin: 8px 0 12px 0;'>
+            <p style='font-size: 13px; font-weight: 500; margin: 0; color: #8E8E93;'>信号等级</p>
         </div>
         """, unsafe_allow_html=True)
         
         col1, col2 = st.sidebar.columns(2)
         
         with col1:
-            if st.button("⭐ A级", use_container_width=True, help="高质量信号，严格筛选", key="btn_a"):
+            if st.button("⭐ A级", use_container_width=True, key="btn_a"):
                 self.apply_strategy_preset("⭐ A级信号")
                 st.rerun()
         
         with col2:
-            if st.button("🎯 B级", use_container_width=True, help="标准质量，平衡频率", key="btn_b"):
+            if st.button("🎯 B级", use_container_width=True, key="btn_b"):
                 self.apply_strategy_preset("🎯 B级信号")
                 st.rerun()
         
-        # 动态检测并显示当前策略（iOS风格）
+        # 当前策略 - 仅显示名称
         detected_strategy = self.detect_current_strategy()
-        
-        if detected_strategy == "🔧 自定义":
-            st.sidebar.markdown(f"""
-            <div style='background-color: #FFF3CD; padding: 12px; border-radius: 10px; margin: 8px 0; border-left: 3px solid #FF9500;'>
-                <p style='font-size: 13px; font-weight: 600; margin: 0 0 4px 0; color: #000000;'>当前策略：{detected_strategy}</p>
-                <p style='font-size: 12px; color: #8E8E93; margin: 0;'>参数已手动调整</p>
-                <p style='font-size: 11px; color: #8E8E93; margin: 4px 0 0 0;'>💡 点击上方按钮恢复预设</p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            current_preset = self.STRATEGY_PRESETS[detected_strategy]
-            st.sidebar.markdown(f"""
-            <div style='background-color: #E5F2FF; padding: 12px; border-radius: 10px; margin: 8px 0; border-left: 3px solid #007AFF;'>
-                <p style='font-size: 13px; font-weight: 600; margin: 0 0 4px 0; color: #000000;'>当前策略：{detected_strategy}</p>
-                <p style='font-size: 12px; color: #8E8E93; margin: 0;'>{current_preset['description']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # 显示完整参数（iOS风格卡片）
-        st.sidebar.markdown("""
-        <div style='background-color: #F9F9F9; padding: 12px; border-radius: 10px; margin: 16px 0 8px 0;'>
-            <p style='font-size: 14px; font-weight: 600; margin: 0; color: #000000;'>📊 策略参数</p>
+        bg_color = "#2A2E39" if st.session_state.dark_mode else "#F9F9F9"
+        text_color = "#D1D4DC" if st.session_state.dark_mode else "#000000"
+        st.sidebar.markdown(f"""
+        <div style='text-align: center; padding: 8px 12px; background-color: {bg_color}; border-radius: 6px; margin: 12px 0; border: 1px solid {"#363A45" if st.session_state.dark_mode else "transparent"};'>
+            <p style='font-size: 14px; font-weight: 600; margin: 0; color: {text_color};'>{detected_strategy}</p>
         </div>
         """, unsafe_allow_html=True)
         
+        # 核心参数 - 紧凑显示
         col_a, col_b = st.sidebar.columns(2)
         with col_a:
-            st.metric("📈 上涨线", f"{st.session_state.theta_up*100:.2f}%")
-            st.metric("🎯 信心度", f"{int(st.session_state.tau_threshold*100)}%")
+            st.metric("上涨", f"{st.session_state.theta_up*100:.1f}%", label_visibility="visible")
+            st.metric("信心", f"{int(st.session_state.tau_threshold*100)}%", label_visibility="visible")
         with col_b:
-            st.metric("📉 下跌线", f"{st.session_state.theta_dn*100:.2f}%")
-            st.metric("💰 收益比", f"{st.session_state.kappa_threshold:.1f}x")
+            st.metric("下跌", f"{st.session_state.theta_dn*100:.1f}%", label_visibility="visible")
+            st.metric("收益", f"{st.session_state.kappa_threshold:.1f}x", label_visibility="visible")
         
-        # 高级参数微调（可展开）
-        with st.sidebar.expander("🔧 高级参数微调", expanded=False):
-            st.caption("手动调整策略参数（专业用户）")
-            
+        # 高级参数微调
+        with st.sidebar.expander("⚙️ 高级设置"):
             st.session_state.theta_up = st.number_input(
-                "📈 上涨判定线 (%)", 
+                "上涨线 (%)", 
                 min_value=0.1, 
                 max_value=2.0, 
                 value=st.session_state.theta_up * 100,
                 step=0.05,
                 format="%.2f",
-                help="价格上涨多少才算真正上涨",
                 key="theta_up_input"
             ) / 100
             
             st.session_state.theta_dn = st.number_input(
-                "📉 下跌判定线 (%)", 
+                "下跌线 (%)", 
                 min_value=0.1, 
                 max_value=1.5, 
                 value=st.session_state.theta_dn * 100,
                 step=0.05,
                 format="%.2f",
-                help="价格下跌多少才算真正下跌",
                 key="theta_dn_input"
             ) / 100
             
             st.session_state.tau_threshold = st.slider(
-                "🎯 信心度阈值",
+                "信心度",
                 min_value=0.5,
                 max_value=0.9,
                 value=st.session_state.tau_threshold,
                 step=0.05,
-                help="预测概率至少要达到这个值",
                 key="tau_input"
             )
             
             st.session_state.kappa_threshold = st.slider(
-                "💰 收益成本比阈值",
+                "收益比",
                 min_value=0.5,
                 max_value=2.0,
                 value=st.session_state.kappa_threshold,
                 step=0.1,
-                help="预期收益与成本的比例",
                 key="kappa_input"
             )
+        
+        st.sidebar.divider()
+        
+        # 主题和刷新控制
+        col_theme, col_auto, col_btn = st.sidebar.columns([1, 1, 1])
+        with col_theme:
+            if st.button("🌙" if not st.session_state.dark_mode else "☀️", 
+                        use_container_width=True, 
+                        help="切换深色/浅色模式",
+                        key="btn_theme"):
+                st.session_state.dark_mode = not st.session_state.dark_mode
+                st.rerun()
+        with col_auto:
+            st.session_state.auto_mode = st.checkbox(
+                "自动", 
+                st.session_state.auto_mode,
+                help="自动刷新数据"
+            )
+        with col_btn:
+            if st.button("🔄", use_container_width=True, key="btn_refresh", help="立即刷新"):
+                st.session_state.last_update = time.time()
+                st.rerun()
             
-            st.warning("⚠️ 修改参数后会覆盖策略预设")
-        
-        # 自动刷新（iOS风格）
-        st.sidebar.markdown("""
-        <div style='background-color: #F9F9F9; padding: 12px; border-radius: 10px; margin: 16px 0;'>
-            <p style='font-size: 14px; font-weight: 600; margin: 0; color: #000000;'>🔄 数据更新</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.session_state.auto_mode = st.sidebar.checkbox(
-            "自动刷新", 
-            st.session_state.auto_mode,
-            help="开启后每秒自动更新数据"
-        )
-        
-        if st.sidebar.button("🔄 立即刷新", use_container_width=True, key="btn_refresh"):
-            st.session_state.last_update = time.time()
-            st.rerun()
-            
-        # 系统状态（iOS风格卡片）
-        st.sidebar.markdown("""
-        <div style='background-color: #F9F9F9; padding: 12px; border-radius: 10px; margin: 16px 0;'>
-            <p style='font-size: 14px; font-weight: 600; margin: 0; color: #000000;'>💡 系统状态</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # 健康检查
+        # 系统状态 - TradingView风格
         health_data = self.fetch_data("health")
         if health_data:
-            if health_data.get("status") == "healthy":
-                st.sidebar.markdown("""
-                <div style='background-color: #D1F4E0; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #34C759;'>
-                    <p style='font-size: 12px; font-weight: 500; margin: 0; color: #000000;'>✅ 系统运行正常</p>
-                </div>
-                """, unsafe_allow_html=True)
+            status = health_data.get("status")
+            lag = health_data.get("exchange_lag_s", 0)
+            
+            if status == "healthy" and lag < 2:
+                status_color = "#26A69A"  # TradingView绿色
+                status_icon = "●"
+                status_text = "正常"
+            elif lag >= 2:
+                status_color = "#FF9800"  # TradingView橙色
+                status_icon = "●"
+                status_text = f"延迟{lag:.1f}s"
             else:
-                st.sidebar.markdown("""
-                <div style='background-color: #FFF3CD; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #FF9500;'>
-                    <p style='font-size: 12px; font-weight: 500; margin: 0; color: #000000;'>⚠️ 系统性能下降</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            exchange_lag = health_data.get("exchange_lag_s", 0)
-            if exchange_lag < 2:
-                st.sidebar.markdown(f"""
-                <div style='background-color: #E5F2FF; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #007AFF;'>
-                    <p style='font-size: 12px; margin: 0; color: #000000;'>📡 数据延迟: {exchange_lag:.1f}秒</p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.sidebar.markdown(f"""
-                <div style='background-color: #FFE4E1; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #FF3B30;'>
-                    <p style='font-size: 12px; font-weight: 500; margin: 0; color: #000000;'>📡 数据延迟较高: {exchange_lag:.1f}秒</p>
-                </div>
-                """, unsafe_allow_html=True)
+                status_color = "#F23645"  # TradingView红色
+                status_icon = "●"
+                status_text = "异常"
         else:
-            st.sidebar.markdown("""
-            <div style='background-color: #FFE4E1; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #FF3B30;'>
-                <p style='font-size: 12px; font-weight: 500; margin: 0; color: #000000;'>❌ 后台服务未连接</p>
-            </div>
-            """, unsafe_allow_html=True)
+            status_color = "#F23645"
+            status_icon = "●"
+            status_text = "离线"
+        
+        status_bg = "#2A2E39" if st.session_state.dark_mode else "#F9F9F9"
+        status_text_color = "#D1D4DC" if st.session_state.dark_mode else "#000000"
+        status_border = "#363A45" if st.session_state.dark_mode else "transparent"
+        
+        st.sidebar.markdown(f"""
+        <div style='text-align: center; padding: 10px; background-color: {status_bg}; border-radius: 6px; margin: 8px 0; border: 1px solid {status_border};'>
+            <p style='font-size: 13px; margin: 0; color: {status_text_color};'>
+                <span style='color: {status_color}; font-size: 16px;'>{status_icon}</span> 
+                系统{status_text}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
     
     def render_realtime_signal_card(self):
         """报告1：实时信号卡片（iOS风格）"""
@@ -535,9 +513,38 @@ class CryptoSurgePredictionDashboard:
         # 应用iOS风格自定义CSS
         st.markdown("""
         <style>
+        /* iOS字体系统 - San Francisco Pro */
+        * {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", 
+                         "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* iOS颜色规范 */
+        :root {
+            --ios-blue: #007AFF;
+            --ios-green: #34C759;
+            --ios-orange: #FF9500;
+            --ios-red: #FF3B30;
+            --ios-gray: #8E8E93;
+            --ios-gray-light: #D1D1D6;
+            --ios-gray-bg: #F2F2F7;
+            --ios-white: #FFFFFF;
+            --ios-black: #000000;
+        }
+        
+        /* iOS字号规范 */
+        h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+        h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.4px; }
+        h3 { font-size: 20px; font-weight: 600; }
+        h4 { font-size: 17px; font-weight: 600; }
+        p { font-size: 15px; font-weight: 400; line-height: 1.5; }
+        small { font-size: 13px; font-weight: 400; }
+        
         /* iOS风格全局样式 */
         .main {
-            background-color: #F2F2F7;
+            background-color: var(--ios-gray-bg);
         }
         
         /* iOS风格内容区 - 主容器 */
@@ -560,16 +567,24 @@ class CryptoSurgePredictionDashboard:
             margin: 8px 0;
         }
         
-        /* iOS风格按钮 */
+        /* iOS间距系统 (4px网格) */
+        .block-container {
+            padding: 16px 24px;
+        }
+        
+        /* iOS风格按钮 - 触控优先 (最小44x44px) */
         .stButton > button {
-            background-color: #007AFF;
+            background-color: var(--ios-blue);
             color: white;
             border: none;
-            border-radius: 10px;
-            padding: 10px 20px;
-            font-weight: 500;
+            border-radius: 12px;
+            min-height: 44px;
+            min-width: 44px;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 600;
             box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .stButton > button:hover {
@@ -579,7 +594,7 @@ class CryptoSurgePredictionDashboard:
         }
         
         .stButton > button:active {
-            transform: translateY(0);
+            transform: scale(0.98);
             box-shadow: 0 1px 4px rgba(0, 122, 255, 0.2);
         }
         
@@ -733,6 +748,21 @@ class CryptoSurgePredictionDashboard:
             overflow: hidden;
         }
         
+        /* 加载动画效果 */
+        @keyframes ios-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        @keyframes ios-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading {
+            animation: ios-pulse 1.5s ease-in-out infinite;
+        }
+        
         /* 移除不必要的边距 */
         .block-container {
             padding-top: 2rem;
@@ -754,6 +784,144 @@ class CryptoSurgePredictionDashboard:
         """, unsafe_allow_html=True)
         
         self.initialize_session_state()
+        
+        # 动态应用TradingView深色模式CSS
+        if st.session_state.dark_mode:
+            st.markdown("""
+            <style>
+            /* TradingView深色风格 */
+            .main {
+                background-color: #131722 !important;
+            }
+            .block-container {
+                background-color: #131722 !important;
+                padding: 16px 24px;
+            }
+            
+            /* 侧边栏TradingView风格 */
+            [data-testid="stSidebar"] {
+                background-color: #1E222D !important;
+                border-right: 1px solid #2A2E39 !important;
+            }
+            
+            /* 文字颜色 */
+            h1, h2, h3, h4 {
+                color: #D1D4DC !important;
+                font-weight: 600;
+            }
+            p, span, div {
+                color: #B2B5BE !important;
+            }
+            
+            /* 度量卡片 */
+            [data-testid="stMetricLabel"] {
+                color: #787B86 !important;
+                font-size: 12px;
+            }
+            [data-testid="stMetricValue"] {
+                color: #D1D4DC !important;
+                font-size: 22px;
+                font-weight: 600;
+            }
+            
+            /* 卡片容器 */
+            .stMarkdown {
+                background-color: #1E222D !important;
+                border: 1px solid #2A2E39 !important;
+                border-radius: 8px !important;
+                color: #D1D4DC !important;
+            }
+            
+            /* 按钮TradingView风格 */
+            .stButton > button {
+                background-color: #2962FF !important;
+                color: #FFFFFF !important;
+                border: none;
+                border-radius: 6px;
+                font-weight: 500;
+            }
+            .stButton > button:hover {
+                background-color: #1E53E5 !important;
+            }
+            
+            /* 侧边栏按钮 */
+            [data-testid="stSidebar"] .stButton > button {
+                background-color: #2A2E39 !important;
+                color: #D1D4DC !important;
+                border: 1px solid #363A45 !important;
+            }
+            [data-testid="stSidebar"] .stButton > button:hover {
+                background-color: #363A45 !important;
+                border-color: #2962FF !important;
+            }
+            
+            /* 输入框 */
+            .stTextInput > div > div > input,
+            .stNumberInput > div > div > input,
+            .stSelectbox > div > div {
+                background-color: #2A2E39 !important;
+                border: 1px solid #363A45 !important;
+                color: #D1D4DC !important;
+            }
+            
+            /* 标签页 */
+            .stTabs [data-baseweb="tab-list"] {
+                background-color: #1E222D !important;
+                border-bottom: 1px solid #2A2E39;
+            }
+            .stTabs [data-baseweb="tab"] {
+                color: #787B86 !important;
+                background-color: transparent;
+            }
+            .stTabs [aria-selected="true"] {
+                color: #D1D4DC !important;
+                background-color: #2A2E39 !important;
+                border-bottom: 2px solid #2962FF !important;
+            }
+            
+            /* 分割线 */
+            hr {
+                border-color: #2A2E39 !important;
+            }
+            
+            /* 展开器 */
+            .streamlit-expanderHeader {
+                background-color: #2A2E39 !important;
+                color: #D1D4DC !important;
+            }
+            
+            /* 表格 */
+            .dataframe {
+                background-color: #1E222D !important;
+                border: 1px solid #2A2E39 !important;
+            }
+            .dataframe th {
+                background-color: #2A2E39 !important;
+                color: #787B86 !important;
+            }
+            .dataframe td {
+                color: #D1D4DC !important;
+            }
+            
+            /* 成功/警告/错误提示 */
+            .element-container:has(> .stSuccess) {
+                background-color: #0B3D0B !important;
+                border-left: 3px solid #26A69A !important;
+            }
+            .element-container:has(> .stWarning) {
+                background-color: #4A3C1A !important;
+                border-left: 3px solid #FF9800 !important;
+            }
+            .element-container:has(> .stError) {
+                background-color: #4A1A1A !important;
+                border-left: 3px solid #F23645 !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+        else:
+            # 浅色模式保留原有iOS风格
+            pass
+        
         self.render_sidebar()
         
         # 自动刷新逻辑
