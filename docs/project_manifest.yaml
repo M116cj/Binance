@@ -1,0 +1,222 @@
+# 加密货币突涨预测系统 - 项目元数据
+# 单一数据源，用于生成README.md和同步replit.md
+
+project:
+  name: "Crypto Surge Prediction System"
+  name_zh: "加密货币突涨预测系统"
+  version: "2.4.0"
+  tagline: "Enterprise-grade cryptocurrency surge prediction with ML-powered real-time signals"
+  tagline_zh: "企业级加密货币突涨预测系统，机器学习驱动的实时交易信号"
+  description: |
+    A cryptocurrency surge prediction system designed to forecast short-term price movements using 
+    Binance market data. It leverages machine learning (LightGBM) with advanced feature engineering 
+    focusing on order book dynamics and market microstructure.
+  repository: "https://github.com/yourusername/crypto-surge-prediction"
+  
+performance:
+  p99_latency: "< 800ms"
+  inference_capacity: "≥ 300 RPS"
+  cache_hit_rate: "71.43%"
+  rate_limit: "300 req/min"
+
+architecture:
+  modes:
+    - name: "Demo Mode"
+      description: "Simulated data for testing and development"
+    - name: "Production Mode"
+      description: "Live Binance market data integration"
+  
+  strategies:
+    - name: "A-tier Signals"
+      icon: "⭐"
+      theta_up: 0.008
+      theta_dn: 0.0056
+      tau: 0.75
+      kappa: 1.2
+      description: "High-probability signals with strict thresholds"
+    - name: "B-tier Signals"
+      icon: "🎯"
+      theta_up: 0.006
+      theta_dn: 0.004
+      tau: 0.65
+      kappa: 1.0
+      description: "Moderate signals for broader opportunities"
+
+  backend:
+    framework: "FastAPI"
+    port: 8000
+    features:
+      - "REST API endpoints"
+      - "LRU+TTL caching (71.43% hit rate)"
+      - "Token bucket rate limiting (300 req/min)"
+      - "Batch query aggregation"
+      - "Real-time WebSocket data ingestion"
+  
+  frontend:
+    framework: "Streamlit"
+    port: 5000
+    theme: "TradingView Dark"
+    features:
+      - "Real-time signal visualization"
+      - "7 specialized analytics reports"
+      - "Server-Sent Events (SSE) updates"
+      - "Theme switching (dark/light)"
+
+  ml_pipeline:
+    model: "LightGBM"
+    inference: "ONNX Runtime"
+    features:
+      - "Order Flow Imbalance (OFI)"
+      - "Market microstructure indicators"
+      - "Numba JIT compilation"
+      - "NumPy vectorization"
+    labeling: "Triple-barrier method"
+    calibration: "Isotonic regression"
+
+  storage:
+    hot_cache: "Redis"
+    cold_storage: "ClickHouse"
+    relational_db: "PostgreSQL"
+
+tech_stack:
+  languages:
+    - "Python 3.11+"
+  
+  backend_libs:
+    - "fastapi"
+    - "uvicorn"
+    - "websockets"
+    - "redis"
+    - "clickhouse-driver"
+    - "sqlalchemy"
+    - "pydantic"
+    - "orjson"
+    - "python-binance"
+  
+  ml_libs:
+    - "lightgbm"
+    - "onnxruntime"
+    - "numpy"
+    - "pandas"
+    - "scipy"
+    - "numba"
+    - "scikit-learn"
+  
+  frontend_libs:
+    - "streamlit"
+    - "plotly"
+    - "httpx"
+  
+  monitoring:
+    - "prometheus-client"
+    - "opentelemetry (optional)"
+
+features:
+  - name: "Real-time Signal Generation"
+    description: "ML-powered trading signals with probability and utility scores"
+  
+  - name: "7 Analytics Reports"
+    components:
+      - "📊 实时信号 (Real-time Signals)"
+      - "📈 概率分析 (Probability Analysis)"
+      - "⚡ 滑动窗口 (Rolling Window)"
+      - "🎯 回测结果 (Backtest Results)"
+      - "📐 校准曲线 (Calibration Curves)"
+      - "🔍 归因分析 (Attribution Analysis)"
+      - "📋 系统监控 (System Monitoring)"
+  
+  - name: "Cost-Aware Decision Framework"
+    description: "Multi-component cost model (fees, slippage, funding, capacity)"
+  
+  - name: "Multi-Symbol Support"
+    description: "Dynamic cryptocurrency pair processing (USDT pairs)"
+  
+  - name: "Data Quality Monitoring"
+    features:
+      - "Real-time outlier detection (Z-score)"
+      - "Data drift detection (Kolmogorov-Smirnov test)"
+      - "Missing value monitoring"
+      - "Freshness alerts"
+  
+  - name: "TradingView-Inspired UI"
+    features:
+      - "Professional dark theme (#131722 background)"
+      - "Color-coded signals (green/red)"
+      - "Interactive charts with Plotly"
+      - "Theme toggle (dark/light)"
+
+installation:
+  prerequisites:
+    - "Python 3.11 or higher"
+    - "PostgreSQL database"
+    - "Redis (optional, for caching)"
+    - "ClickHouse (optional, for time series storage)"
+  
+  steps:
+    - "Clone the repository"
+    - "Install dependencies: pip install -r requirements.txt"
+    - "Set up environment variables (DATABASE_URL, XAI_API_KEY, etc.)"
+    - "Run database migrations"
+    - "Start backend: python -m backend.api_server"
+    - "Start frontend: streamlit run main.py --server.port 5000"
+
+environment_variables:
+  required:
+    - name: "DATABASE_URL"
+      description: "PostgreSQL connection string"
+    - name: "PGHOST"
+      description: "PostgreSQL host"
+    - name: "PGPORT"
+      description: "PostgreSQL port"
+    - name: "PGDATABASE"
+      description: "PostgreSQL database name"
+    - name: "PGUSER"
+      description: "PostgreSQL username"
+    - name: "PGPASSWORD"
+      description: "PostgreSQL password"
+  
+  optional:
+    - name: "XAI_API_KEY"
+      description: "xAI Grok API key for AI-enhanced analysis"
+    - name: "REDIS_URL"
+      description: "Redis connection string for caching"
+    - name: "CLICKHOUSE_HOST"
+      description: "ClickHouse host for time series storage"
+
+deployment:
+  platforms:
+    - name: "Replit"
+      description: "Automatic deployment with managed services"
+    - name: "Railway"
+      description: "Multi-service deployment with HTTPS"
+    - name: "Docker"
+      description: "Containerized deployment"
+
+ui_theme:
+  default: "dark"
+  colors:
+    primary: "#2962FF"
+    background: "#131722"
+    secondary_background: "#1E222D"
+    card_background: "#2A2E39"
+    text: "#D1D4DC"
+    secondary_text: "#787B86"
+    border: "#363A45"
+    bullish: "#26A69A"
+    bearish: "#F23645"
+    warning: "#FF9800"
+
+recent_updates:
+  - version: "2.4.0"
+    date: "2025-10-22"
+    title: "TradingView Dark Theme Overhaul"
+    changes:
+      - "Switched default theme to TradingView-inspired dark mode"
+      - "Professional color scheme (#131722 background, #2962FF accent)"
+      - "Enhanced contrast for better readability"
+      - "Added theme toggle (dark/light modes)"
+      - "Optimized all UI elements for dark backgrounds"
+
+license: "MIT"
+author: "Your Name"
+contact: "your.email@example.com"
