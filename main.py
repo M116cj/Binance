@@ -147,10 +147,16 @@ class CryptoSurgePredictionDashboard:
         return fallback
     
     def render_sidebar(self):
-        """渲染控制侧边栏"""
-        st.sidebar.title("🚀 加密货币涨跌预测系统")
-        st.sidebar.markdown("实时监控币价，智能预测涨跌")
-        st.sidebar.markdown("---")
+        """渲染控制侧边栏（iOS风格）"""
+        # iOS风格标题
+        st.sidebar.markdown("""
+        <div style='text-align: center; padding: 16px 0 8px 0;'>
+            <h1 style='font-size: 28px; margin: 0; font-weight: 700;'>🚀</h1>
+            <h2 style='font-size: 20px; margin: 8px 0 4px 0; font-weight: 600;'>加密货币预测</h2>
+            <p style='font-size: 13px; color: #8E8E93; margin: 0;'>智能涨跌预测系统</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.sidebar.markdown("")
         
         # 交易对选择 - 从后端动态加载
         available_symbols = self.load_available_symbols()
@@ -182,40 +188,60 @@ class CryptoSurgePredictionDashboard:
         
         st.session_state.selected_symbol = symbol_map[selected_display]
         
-        # 策略快速切换（优化后两档模型）
-        st.sidebar.markdown("### 🎯 信号等级切换")
-        st.sidebar.caption("两档信号质量，优化后参数")
+        # 策略快速切换（iOS风格）
+        st.sidebar.markdown("""
+        <div style='background-color: #F9F9F9; padding: 12px; border-radius: 10px; margin: 16px 0;'>
+            <p style='font-size: 14px; font-weight: 600; margin: 0 0 8px 0; color: #000000;'>🎯 信号等级</p>
+            <p style='font-size: 12px; color: #8E8E93; margin: 0;'>选择预测精度级别</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         col1, col2 = st.sidebar.columns(2)
         
         with col1:
-            if st.button("⭐\nA级信号", use_container_width=True, help="高质量信号，严格筛选"):
+            if st.button("⭐ A级", use_container_width=True, help="高质量信号，严格筛选", key="btn_a"):
                 self.apply_strategy_preset("⭐ A级信号")
                 st.rerun()
         
         with col2:
-            if st.button("🎯\nB级信号", use_container_width=True, help="标准质量，平衡频率"):
+            if st.button("🎯 B级", use_container_width=True, help="标准质量，平衡频率", key="btn_b"):
                 self.apply_strategy_preset("🎯 B级信号")
                 st.rerun()
         
-        # 动态检测并显示当前策略
+        # 动态检测并显示当前策略（iOS风格）
         detected_strategy = self.detect_current_strategy()
         
         if detected_strategy == "🔧 自定义":
-            st.sidebar.warning(f"**当前策略：** {detected_strategy}\n\n参数已手动调整，偏离预设配置\n\n💡 点击上方按钮可恢复到预设策略")
+            st.sidebar.markdown(f"""
+            <div style='background-color: #FFF3CD; padding: 12px; border-radius: 10px; margin: 8px 0; border-left: 3px solid #FF9500;'>
+                <p style='font-size: 13px; font-weight: 600; margin: 0 0 4px 0; color: #000000;'>当前策略：{detected_strategy}</p>
+                <p style='font-size: 12px; color: #8E8E93; margin: 0;'>参数已手动调整</p>
+                <p style='font-size: 11px; color: #8E8E93; margin: 4px 0 0 0;'>💡 点击上方按钮恢复预设</p>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             current_preset = self.STRATEGY_PRESETS[detected_strategy]
-            st.sidebar.info(f"**当前策略：** {detected_strategy}\n\n{current_preset['description']}")
+            st.sidebar.markdown(f"""
+            <div style='background-color: #E5F2FF; padding: 12px; border-radius: 10px; margin: 8px 0; border-left: 3px solid #007AFF;'>
+                <p style='font-size: 13px; font-weight: 600; margin: 0 0 4px 0; color: #000000;'>当前策略：{detected_strategy}</p>
+                <p style='font-size: 12px; color: #8E8E93; margin: 0;'>{current_preset['description']}</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # 显示完整参数（4个关键指标）
-        st.sidebar.markdown("### 📊 策略参数总览")
+        # 显示完整参数（iOS风格卡片）
+        st.sidebar.markdown("""
+        <div style='background-color: #F9F9F9; padding: 12px; border-radius: 10px; margin: 16px 0 8px 0;'>
+            <p style='font-size: 14px; font-weight: 600; margin: 0; color: #000000;'>📊 策略参数</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         col_a, col_b = st.sidebar.columns(2)
         with col_a:
-            st.metric("上涨线", f"{st.session_state.theta_up*100:.2f}%")
-            st.metric("信心度", f"{int(st.session_state.tau_threshold*100)}%")
+            st.metric("📈 上涨线", f"{st.session_state.theta_up*100:.2f}%")
+            st.metric("🎯 信心度", f"{int(st.session_state.tau_threshold*100)}%")
         with col_b:
-            st.metric("下跌线", f"{st.session_state.theta_dn*100:.2f}%")
-            st.metric("收益倍数", f"{st.session_state.kappa_threshold:.1f}x")
+            st.metric("📉 下跌线", f"{st.session_state.theta_dn*100:.2f}%")
+            st.metric("💰 收益比", f"{st.session_state.kappa_threshold:.1f}x")
         
         # 高级参数微调（可展开）
         with st.sidebar.expander("🔧 高级参数微调", expanded=False):
@@ -265,37 +291,65 @@ class CryptoSurgePredictionDashboard:
             
             st.warning("⚠️ 修改参数后会覆盖策略预设")
         
-        # 自动刷新
-        st.sidebar.markdown("---")
+        # 自动刷新（iOS风格）
+        st.sidebar.markdown("""
+        <div style='background-color: #F9F9F9; padding: 12px; border-radius: 10px; margin: 16px 0;'>
+            <p style='font-size: 14px; font-weight: 600; margin: 0; color: #000000;'>🔄 数据更新</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.session_state.auto_mode = st.sidebar.checkbox(
-            "🔄 自动刷新数据", 
+            "自动刷新", 
             st.session_state.auto_mode,
             help="开启后每秒自动更新数据"
         )
         
-        if st.sidebar.button("🔄 立即刷新", width='stretch'):
+        if st.sidebar.button("🔄 立即刷新", use_container_width=True, key="btn_refresh"):
             st.session_state.last_update = time.time()
             st.rerun()
             
-        # 系统状态
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### 💡 系统状态")
+        # 系统状态（iOS风格卡片）
+        st.sidebar.markdown("""
+        <div style='background-color: #F9F9F9; padding: 12px; border-radius: 10px; margin: 16px 0;'>
+            <p style='font-size: 14px; font-weight: 600; margin: 0; color: #000000;'>💡 系统状态</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # 健康检查
         health_data = self.fetch_data("health")
         if health_data:
             if health_data.get("status") == "healthy":
-                st.sidebar.success("✅ 系统运行正常")
+                st.sidebar.markdown("""
+                <div style='background-color: #D1F4E0; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #34C759;'>
+                    <p style='font-size: 12px; font-weight: 500; margin: 0; color: #000000;'>✅ 系统运行正常</p>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.sidebar.warning("⚠️ 系统性能下降")
+                st.sidebar.markdown("""
+                <div style='background-color: #FFF3CD; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #FF9500;'>
+                    <p style='font-size: 12px; font-weight: 500; margin: 0; color: #000000;'>⚠️ 系统性能下降</p>
+                </div>
+                """, unsafe_allow_html=True)
                 
             exchange_lag = health_data.get("exchange_lag_s", 0)
             if exchange_lag < 2:
-                st.sidebar.info(f"📡 数据延迟：{exchange_lag:.1f}秒")
+                st.sidebar.markdown(f"""
+                <div style='background-color: #E5F2FF; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #007AFF;'>
+                    <p style='font-size: 12px; margin: 0; color: #000000;'>📡 数据延迟: {exchange_lag:.1f}秒</p>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.sidebar.error(f"📡 数据延迟较高：{exchange_lag:.1f}秒")
+                st.sidebar.markdown(f"""
+                <div style='background-color: #FFE4E1; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #FF3B30;'>
+                    <p style='font-size: 12px; font-weight: 500; margin: 0; color: #000000;'>📡 数据延迟较高: {exchange_lag:.1f}秒</p>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.sidebar.error("❌ 后台服务未连接")
+            st.sidebar.markdown("""
+            <div style='background-color: #FFE4E1; padding: 10px; border-radius: 8px; margin: 4px 0; border-left: 3px solid #FF3B30;'>
+                <p style='font-size: 12px; font-weight: 500; margin: 0; color: #000000;'>❌ 后台服务未连接</p>
+            </div>
+            """, unsafe_allow_html=True)
     
     def render_realtime_signal_card(self):
         """报告1：实时信号卡片"""
