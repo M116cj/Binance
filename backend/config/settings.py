@@ -237,15 +237,15 @@ class AppSettings(BaseSettings):
     version: str = Field("2.0.0", description="系统版本")
     
     # 组件配置  
-    ingestion: IngestionSettings = IngestionSettings()
-    feature: FeatureSettings = FeatureSettings()
-    model: ModelSettings = ModelSettings()
-    labeling: LabelingSettings = LabelingSettings()
-    risk: RiskSettings = RiskSettings()
-    database: DatabaseSettings = DatabaseSettings()
-    api: APISettings = APISettings()
-    monitoring: MonitoringSettings = MonitoringSettings()
-    backtest: BacktestSettings = BacktestSettings()
+    ingestion: IngestionSettings = Field(default_factory=IngestionSettings)  # type: ignore
+    feature: FeatureSettings = Field(default_factory=FeatureSettings)  # type: ignore
+    model: ModelSettings = Field(default_factory=ModelSettings)  # type: ignore
+    labeling: LabelingSettings = Field(default_factory=LabelingSettings)  # type: ignore
+    risk: RiskSettings = Field(default_factory=RiskSettings)  # type: ignore
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)  # type: ignore
+    api: APISettings = Field(default_factory=APISettings)  # type: ignore
+    monitoring: MonitoringSettings = Field(default_factory=MonitoringSettings)  # type: ignore
+    backtest: BacktestSettings = Field(default_factory=BacktestSettings)  # type: ignore
     
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -291,7 +291,7 @@ settings = get_settings()
 
 
 # 环境特定配置加载器
-def load_config_for_env(env: str) -> AppSettings:
+def load_config_for_env(env: Literal["dev", "staging", "prod"]) -> AppSettings:
     """
     加载特定环境的配置
     
