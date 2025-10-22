@@ -36,7 +36,7 @@ class FeatureSettings(BaseSettings):
     
     # 时间窗口（毫秒）
     window_lengths_ms: List[int] = Field([50, 250, 1000], description="多时间窗口特征")
-    horizon_minutes: List[int] = Field([5, 10, 30], description="预测时间窗口（分钟）")
+    horizon_minutes: List[int] = Field([10, 20], description="预测时间窗口（分钟）- 优化为2窗口")
     
     # 缓冲区配置
     ring_buffer_size: int = Field(10000, description="环形缓冲区大小")
@@ -60,8 +60,8 @@ class ModelSettings(BaseSettings):
     learning_rate: float = Field(0.01, gt=0.0, lt=1.0, description="学习率")
     n_estimators: int = Field(500, ge=100, le=2000, description="估计器数量")
     
-    # Focal Loss
-    focal_gamma: float = Field(1.5, ge=0.0, le=5.0, description="Focal Loss gamma")
+    # Focal Loss (优化后)
+    focal_gamma: float = Field(1.8, ge=0.0, le=5.0, description="Focal Loss gamma - 优化提升至1.8")
     
     # 校准
     calibration_method: Literal["isotonic", "sigmoid", "beta"] = Field(
@@ -83,15 +83,15 @@ class ModelSettings(BaseSettings):
 
 
 class LabelingSettings(BaseSettings):
-    """标记和训练配置"""
+    """标记和训练配置（优化后参数，2025-10-22）"""
     
-    # Triple Barrier参数
-    theta_up: float = Field(0.006, gt=0.0, lt=0.1, description="上涨阈值")
-    theta_dn: float = Field(0.004, gt=0.0, lt=0.1, description="下跌阈值")
+    # Triple Barrier参数（优化后）
+    theta_up: float = Field(0.008, gt=0.0, lt=0.1, description="上涨阈值 - 优化为0.8%")
+    theta_dn: float = Field(0.0056, gt=0.0, lt=0.1, description="下跌阈值 - 优化为0.56% (70% of theta_up)")
     max_hold_minutes: int = Field(60, ge=5, le=480, description="最大持有时间（分钟）")
     
-    # 时间隔离
-    cooldown_minutes: int = Field(30, ge=10, le=120, description="冷却期（分钟）")
+    # 时间隔离（优化后）
+    cooldown_minutes: int = Field(15, ge=10, le=120, description="冷却期 - 优化为15分钟")
     embargo_pct: float = Field(0.01, ge=0.0, le=0.1, description="禁入期百分比")
     n_splits: int = Field(5, ge=3, le=10, description="K折数量")
     
@@ -103,7 +103,7 @@ class LabelingSettings(BaseSettings):
 
 
 class RiskSettings(BaseSettings):
-    """风险控制和成本配置"""
+    """风险控制和成本配置（优化后两档模型，2025-10-22）"""
     
     # 交易成本
     maker_fee: float = Field(0.0002, description="挂单手续费")
@@ -118,15 +118,20 @@ class RiskSettings(BaseSettings):
     max_consecutive_losses: int = Field(5, description="最大连续亏损次数")
     max_drawdown_pct: float = Field(0.15, description="最大回撤百分比")
     
-    # 决策阈值（策略层级）
-    tau_conservative: float = Field(0.75, description="保守策略-概率阈值")
-    kappa_conservative: float = Field(1.20, description="保守策略-效用阈值")
+    # 决策阈值（优化后两档模型：A级/B级）
+    tau_tier_a: float = Field(0.75, description="A级信号-概率阈值")
+    kappa_tier_a: float = Field(1.20, description="A级信号-效用阈值")
     
-    tau_balanced: float = Field(0.65, description="平衡策略-概率阈值")
-    kappa_balanced: float = Field(1.00, description="平衡策略-效用阈值")
+    tau_tier_b: float = Field(0.70, description="B级信号-概率阈值")
+    kappa_tier_b: float = Field(1.10, description="B级信号-效用阈值")
     
-    tau_aggressive: float = Field(0.55, description="激进策略-概率阈值")
-    kappa_aggressive: float = Field(0.80, description="激进策略-效用阈值")
+    # 向后兼容旧字段名（保留以防止代码破坏）
+    tau_conservative: float = Field(0.75, description="保守策略-概率阈值（等同于A级）")
+    kappa_conservative: float = Field(1.20, description="保守策略-效用阈值（等同于A级）")
+    tau_balanced: float = Field(0.70, description="平衡策略-概率阈值（等同于B级）")
+    kappa_balanced: float = Field(1.10, description="平衡策略-效用阈值（等同于B级）")
+    tau_aggressive: float = Field(0.70, description="激进策略-概率阈值（已废弃，使用tier_b）")
+    kappa_aggressive: float = Field(1.10, description="激进策略-效用阈值（已废弃，使用tier_b）")
     
     model_config = SettingsConfigDict(env_prefix='RISK_')
 
@@ -206,9 +211,9 @@ class MonitoringSettings(BaseSettings):
 
 
 class BacktestSettings(BaseSettings):
-    """回测配置"""
+    """回测配置（优化后）"""
     
-    days_back: int = Field(30, ge=1, le=365, description="回测天数")
+    days_back: int = Field(20, ge=1, le=365, description="回测天数 - 优化为20天")
     initial_capital: float = Field(10000.0, description="初始资金")
     
     # 撮合引擎

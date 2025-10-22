@@ -24,14 +24,14 @@ class MonitoringDashboard:
         # 获取最近的信号以进行准确的百分位数计算
         recent_signals = fetch_data_fn("signals", {'limit': 1000})
         
-        # 获取回测数据以获取性能指标（使用默认参数）
+        # 获取回测数据以获取性能指标（使用优化后参数）
         backtest_data = fetch_data_fn("reports/backtest", {
             'symbol': 'BTCUSDT',
-            'theta_up': 0.006,
-            'theta_dn': 0.004,
-            'tau': 0.75,
-            'kappa': 1.20,
-            'days_back': 30
+            'theta_up': 0.008,  # 优化为0.8%
+            'theta_dn': 0.0056,  # 优化为0.56%
+            'tau': 0.75,  # A级阈值
+            'kappa': 1.20,  # A级阈值
+            'days_back': 20  # 优化为20天
         })
         
         # SLA概览

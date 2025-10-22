@@ -28,31 +28,23 @@ BACKEND_PORT = os.getenv("BACKEND_PORT", "8000")
 BASE_URL = f"http://{BACKEND_HOST}:{BACKEND_PORT}"
 
 class CryptoSurgePredictionDashboard:
-    # 策略预设配置（基于用户参数优化建议）
+    # 策略预设配置（优化后两档模型，2025-10-22）
     STRATEGY_PRESETS = {
-        "🛡️ 保守型": {
-            "theta_up": 0.006,  # 0.6% (6bp)
-            "theta_dn": 0.004,  # 0.4%
-            "tau_threshold": 0.75,  # p_up > 75%
+        "⭐ A级信号": {
+            "theta_up": 0.008,  # 0.8% - 优化后更宽覆盖范围
+            "theta_dn": 0.0056,  # 0.56% (70% of theta_up)
+            "tau_threshold": 0.75,  # p_up > 75% - 高质量信号
             "kappa_threshold": 1.20,  # 收益 > 1.2倍成本
-            "description": "高确定性交易，安全第一",
-            "icon": "🛡️"
+            "description": "高质量信号，严格筛选",
+            "icon": "⭐"
         },
-        "⚖️ 平衡型": {
-            "theta_up": 0.004,  # 0.4% (4bp)
-            "theta_dn": 0.003,  # 0.3%
-            "tau_threshold": 0.65,  # p_up > 65%
-            "kappa_threshold": 1.00,  # 收益 > 1.0倍成本
-            "description": "平衡收益与风险",
-            "icon": "⚖️"
-        },
-        "🔥 激进型": {
-            "theta_up": 0.002,  # 0.2% (2bp)
-            "theta_dn": 0.0015,  # 0.15%
-            "tau_threshold": 0.55,  # p_up > 55%
-            "kappa_threshold": 0.80,  # 收益 > 0.8倍成本
-            "description": "更多交易机会，高风险高回报",
-            "icon": "🔥"
+        "🎯 B级信号": {
+            "theta_up": 0.008,  # 0.8% - 与A级相同
+            "theta_dn": 0.0056,  # 0.56%
+            "tau_threshold": 0.70,  # p_up > 70% - 标准质量
+            "kappa_threshold": 1.10,  # 收益 > 1.1倍成本
+            "description": "标准质量信号，平衡频率",
+            "icon": "🎯"
         }
     }
     
@@ -69,21 +61,21 @@ class CryptoSurgePredictionDashboard:
         self.monitoring_dashboard = MonitoringDashboard()
         
     def initialize_session_state(self):
-        """初始化Streamlit会话状态变量"""
+        """初始化Streamlit会话状态变量（优化后参数，2025-10-22）"""
         if 'selected_symbol' not in st.session_state:
             st.session_state.selected_symbol = 'BTCUSDT'
         if 'current_strategy' not in st.session_state:
-            st.session_state.current_strategy = "🛡️ 保守型"  # 默认保守策略
+            st.session_state.current_strategy = "⭐ A级信号"  # 默认A级信号
         if 'theta_up' not in st.session_state:
-            st.session_state.theta_up = 0.006  # 0.6%
+            st.session_state.theta_up = 0.008  # 0.8% (优化后)
         if 'theta_dn' not in st.session_state:
-            st.session_state.theta_dn = 0.004  # 0.4%
+            st.session_state.theta_dn = 0.0056  # 0.56% (70% of theta_up)
         if 'horizon_minutes' not in st.session_state:
-            st.session_state.horizon_minutes = [5, 10, 30]
+            st.session_state.horizon_minutes = [10, 20]  # 优化为2个窗口
         if 'tau_threshold' not in st.session_state:
-            st.session_state.tau_threshold = 0.75
+            st.session_state.tau_threshold = 0.75  # A级默认
         if 'kappa_threshold' not in st.session_state:
-            st.session_state.kappa_threshold = 1.20
+            st.session_state.kappa_threshold = 1.20  # A级默认
         if 'auto_mode' not in st.session_state:
             st.session_state.auto_mode = True
         if 'last_update' not in st.session_state:
@@ -190,25 +182,20 @@ class CryptoSurgePredictionDashboard:
         
         st.session_state.selected_symbol = symbol_map[selected_display]
         
-        # 策略快速切换（优先）
-        st.sidebar.markdown("### 🎯 策略快速切换")
-        st.sidebar.caption("一键应用推荐参数组合")
+        # 策略快速切换（优化后两档模型）
+        st.sidebar.markdown("### 🎯 信号等级切换")
+        st.sidebar.caption("两档信号质量，优化后参数")
         
-        col1, col2, col3 = st.sidebar.columns(3)
+        col1, col2 = st.sidebar.columns(2)
         
         with col1:
-            if st.button("🛡️\n保守", use_container_width=True, help="高确定性，安全第一"):
-                self.apply_strategy_preset("🛡️ 保守型")
+            if st.button("⭐\nA级信号", use_container_width=True, help="高质量信号，严格筛选"):
+                self.apply_strategy_preset("⭐ A级信号")
                 st.rerun()
         
         with col2:
-            if st.button("⚖️\n平衡", use_container_width=True, help="平衡收益与风险"):
-                self.apply_strategy_preset("⚖️ 平衡型")
-                st.rerun()
-        
-        with col3:
-            if st.button("🔥\n激进", use_container_width=True, help="高回报高风险"):
-                self.apply_strategy_preset("🔥 激进型")
+            if st.button("🎯\nB级信号", use_container_width=True, help="标准质量，平衡频率"):
+                self.apply_strategy_preset("🎯 B级信号")
                 st.rerun()
         
         # 动态检测并显示当前策略
