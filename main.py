@@ -540,13 +540,24 @@ class CryptoSurgePredictionDashboard:
             background-color: #F2F2F7;
         }
         
-        /* iOS风格卡片 */
-        .stMarkdown, div[data-testid="stVerticalBlock"] > div {
+        /* iOS风格内容区 - 主容器 */
+        .block-container {
+            background-color: #F2F2F7 !important;
+        }
+        
+        /* iOS风格列容器 */
+        [data-testid="column"] {
+            background-color: transparent;
+        }
+        
+        /* Streamlit组件基础样式 */
+        .stMarkdown,
+        [data-testid="stMarkdownContainer"] {
             background-color: #FFFFFF;
             border-radius: 12px;
             padding: 16px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-            margin-bottom: 12px;
+            margin: 8px 0;
         }
         
         /* iOS风格按钮 */
