@@ -24,14 +24,24 @@ class MonitoringDashboard:
         # 获取最近的信号以进行准确的百分位数计算
         recent_signals = fetch_data_fn("signals", {'limit': 1000})
         
+        # 获取回测数据以获取性能指标（使用默认参数）
+        backtest_data = fetch_data_fn("reports/backtest", {
+            'symbol': 'BTCUSDT',
+            'theta_up': 0.006,
+            'theta_dn': 0.004,
+            'tau': 0.75,
+            'kappa': 1.20,
+            'days_back': 30
+        })
+        
         # SLA概览
         self._render_sla_overview(signals_stats, health_data, recent_signals)
         
         # 延迟跟踪
         self._render_latency_tracking(fetch_data_fn)
         
-        # 质量指标
-        self._render_quality_indicators(signals_stats)
+        # 质量指标（包含交易性能和风险指标）
+        self._render_quality_indicators(signals_stats, backtest_data)
         
         # 系统健康状态
         self._render_system_health(health_data, models_data)
@@ -199,14 +209,14 @@ class MonitoringDashboard:
             
             st.plotly_chart(fig_pie, width='stretch')
     
-    def _render_quality_indicators(self, signals_stats: Optional[Dict]):
-        """渲染信号质量和模型性能指标"""
-        st.markdown("#### ✨ Quality Indicators")
+    def _render_quality_indicators(self, signals_stats: Optional[Dict], backtest_data: Optional[Dict]):
+        """渲染信号质量、交易性能和风险指标"""
+        st.markdown("#### ✨ Quality & Performance Indicators")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("##### Signal Quality")
+            st.markdown("##### 📊 Signal Quality")
             
             # 从真实数据计算等级分布
             total_signals = signals_stats.get('total_signals', 0) if signals_stats else 0
@@ -225,19 +235,59 @@ class MonitoringDashboard:
             a_tier_pct = (a_tier_total / total_signals * 100) if total_signals > 0 else 0
             avg_utility = avg_utility / count if count > 0 else 0
             
-            st.metric("A-tier Signal Rate", f"{a_tier_pct:.1f}%")
-            st.metric("Avg Signal Utility", f"{avg_utility:.2f}")
-            st.metric("Total Signals (24h)", total_signals)
+            # 信号频率（每小时）
+            signals_per_hour = total_signals / 24.0 if total_signals > 0 else 0
+            
+            st.metric("A级信号率", f"{a_tier_pct:.1f}%", 
+                     help="高置信度信号占比（p_up > τ, utility > κ）")
+            st.metric("信号频率", f"{signals_per_hour:.1f}/小时",
+                     help="平均每小时产生的交易信号数量")
+            st.metric("平均收益倍数", f"{avg_utility:.2f}x",
+                     help="预期收益与成本的平均比例")
         
         with col2:
-            st.markdown("##### Model Performance")
+            st.markdown("##### 💰 Trading Performance")
             
-            st.info("Model metrics require /models endpoint extension with performance tracking")
+            # 从回测数据提取性能指标
+            if backtest_data and 'performance_summary' in backtest_data:
+                perf = backtest_data['performance_summary']
+                hit_rate = perf.get('hit_rate', 0)
+                total_return = perf.get('total_return', 0)
+                profit_factor = perf.get('profit_factor', 0)
+                
+                st.metric("胜率", f"{hit_rate:.1%}",
+                         delta="超过50%" if hit_rate > 0.5 else "低于50%",
+                         help="预测正确的次数占总次数的比例")
+                st.metric("累计收益", f"{total_return:.2%}",
+                         delta=f"{total_return:.2%}",
+                         delta_color="normal" if total_return > 0 else "inverse",
+                         help="策略在统计周期内的总收益")
+                st.metric("盈亏比", f"{profit_factor:.2f}",
+                         help="总盈利与总亏损的比例")
+            else:
+                st.info("回测数据加载中...")
         
         with col3:
-            st.markdown("##### Data Pipeline")
+            st.markdown("##### ⚠️ Risk Metrics")
             
-            st.info("Pipeline metrics require dedicated metrics endpoint")
+            # 从回测数据提取风险指标
+            if backtest_data and 'performance_summary' in backtest_data:
+                perf = backtest_data['performance_summary']
+                sharpe_ratio = perf.get('sharpe_ratio_post_cost', 0)
+                max_drawdown = perf.get('max_drawdown', 0)
+                volatility = perf.get('volatility', 0)
+                
+                st.metric("夏普比率", f"{sharpe_ratio:.2f}",
+                         delta="优秀" if sharpe_ratio > 1.5 else ("良好" if sharpe_ratio > 1.0 else "需提升"),
+                         help="风险调整后的收益指标，越高越好（>1.5为优秀）")
+                st.metric("最大回撤", f"{max_drawdown:.2%}",
+                         delta=f"{max_drawdown:.2%}",
+                         delta_color="normal" if max_drawdown > -0.1 else "inverse",
+                         help="从最高点到最低点的最大跌幅")
+                st.metric("波动率", f"{volatility:.2%}",
+                         help="日收益率的标准差（年化）")
+            else:
+                st.info("风险指标加载中...")
         
         # 注意：趋势图需要历史聚合端点
     
