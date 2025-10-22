@@ -64,6 +64,64 @@ Preferred communication style: Simple, everyday language.
 - ✅ 主题切换功能正常
 - ✅ 应用正常运行
 
+### 2025-10-22: README自动化系统（v2.5）✅ 已完成
+1. **项目文档结构**：
+   - 创建`docs/project_manifest.yaml`作为单一数据源
+   - 所有项目元数据集中管理（功能、架构、技术栈等）
+   - 确保README.md和replit.md数据一致性
+
+2. **README自动生成系统**：
+   - 创建`docs/README_template.md`模板文件
+   - 实现`scripts/update_readme.py`自动生成脚本
+   - 使用Jinja2模板引擎渲染README
+   - 从project_manifest.yaml提取所有元数据
+
+3. **GitHub Actions自动化**：
+   - 创建`.github/workflows/update-readme.yml`工作流
+   - 自动触发条件：
+     - Push到main分支（修改文档文件时）
+     - 手动触发
+     - 每周日自动运行
+   - 自动提交更新的README（标记[skip ci]避免循环）
+
+4. **开发者指南**：
+   - 创建`CONTRIBUTING.md`贡献指南
+   - 说明文档更新流程和最佳实践
+   - 代码风格和提交规范
+
+5. **环境配置示例**：
+   - 创建`.env.example`文件
+   - 包含所有必需和可选的环境变量
+   - 便于新开发者快速设置
+
+**工作流程**：
+1. 修改`docs/project_manifest.yaml`
+2. 运行`python scripts/update_readme.py`生成README
+3. GitHub Actions自动同步（推送到GitHub时）
+
+**文件结构**：
+```
+├── docs/
+│   ├── project_manifest.yaml      # 单一数据源
+│   └── README_template.md         # README模板
+├── scripts/
+│   └── update_readme.py           # 自动生成脚本
+├── .github/
+│   └── workflows/
+│       └── update-readme.yml      # CI/CD工作流
+├── README.md                       # 自动生成（勿手动编辑）
+├── CONTRIBUTING.md                 # 贡献指南
+├── .env.example                    # 环境变量示例
+└── replit.md                       # 项目文档（手动维护）
+```
+
+**测试结果**：
+- ✅ README.md成功生成（10066字符）
+- ✅ 包含完整的项目信息和徽章
+- ✅ 格式正确，结构清晰
+- ✅ GitHub Actions工作流配置完成
+- ✅ CONTRIBUTING.md和.env.example创建成功
+
 ## System Architecture
 
 ### UI/UX Decisions
