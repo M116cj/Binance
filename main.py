@@ -442,6 +442,216 @@ class CryptoSurgePredictionDashboard:
             initial_sidebar_state="expanded"
         )
         
+        # 应用iOS风格自定义CSS
+        st.markdown("""
+        <style>
+        /* iOS风格全局样式 */
+        .main {
+            background-color: #F2F2F7;
+        }
+        
+        /* iOS风格卡片 */
+        .stMarkdown, div[data-testid="stVerticalBlock"] > div {
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            margin-bottom: 12px;
+        }
+        
+        /* iOS风格按钮 */
+        .stButton > button {
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 20px;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
+            transition: all 0.2s ease;
+        }
+        
+        .stButton > button:hover {
+            background-color: #0051D5;
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        
+        .stButton > button:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 4px rgba(0, 122, 255, 0.2);
+        }
+        
+        /* iOS风格标签页 */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background-color: #F2F2F7;
+            border-radius: 12px;
+            padding: 4px;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            background-color: transparent;
+            border-radius: 8px;
+            color: #8E8E93;
+            font-weight: 500;
+            padding: 8px 16px;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background-color: #FFFFFF;
+            color: #007AFF;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        
+        /* iOS风格度量卡片 */
+        [data-testid="stMetricValue"] {
+            font-size: 24px;
+            font-weight: 600;
+            color: #000000;
+        }
+        
+        [data-testid="stMetricLabel"] {
+            font-size: 13px;
+            color: #8E8E93;
+            font-weight: 400;
+        }
+        
+        /* iOS风格侧边栏 */
+        [data-testid="stSidebar"] {
+            background-color: #FFFFFF;
+            border-right: 1px solid #E5E5EA;
+        }
+        
+        [data-testid="stSidebar"] .stButton > button {
+            background: linear-gradient(180deg, #FFFFFF 0%, #F9F9F9 100%);
+            color: #007AFF;
+            border: 1px solid #D1D1D6;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+        
+        [data-testid="stSidebar"] .stButton > button:hover {
+            background: linear-gradient(180deg, #F9F9F9 0%, #F2F2F2 100%);
+            border-color: #007AFF;
+        }
+        
+        /* iOS风格输入框 */
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input,
+        .stSelectbox > div > div {
+            border: 1px solid #D1D1D6;
+            border-radius: 10px;
+            background-color: #FFFFFF;
+            color: #000000;
+            padding: 8px 12px;
+        }
+        
+        /* iOS风格滑块 */
+        .stSlider > div > div > div {
+            background-color: #007AFF;
+        }
+        
+        /* iOS风格信息框 */
+        .stAlert {
+            border-radius: 12px;
+            border: none;
+            padding: 12px 16px;
+        }
+        
+        [data-baseweb="notification"] {
+            border-radius: 12px;
+        }
+        
+        /* iOS风格成功提示 */
+        .element-container:has(> .stSuccess) {
+            background-color: #D1F4E0;
+            border-radius: 10px;
+            padding: 8px;
+        }
+        
+        /* iOS风格警告提示 */
+        .element-container:has(> .stWarning) {
+            background-color: #FFF3CD;
+            border-radius: 10px;
+            padding: 8px;
+        }
+        
+        /* iOS风格错误提示 */
+        .element-container:has(> .stError) {
+            background-color: #FFE4E1;
+            border-radius: 10px;
+            padding: 8px;
+        }
+        
+        /* iOS风格信息提示 */
+        .element-container:has(> .stInfo) {
+            background-color: #E5F2FF;
+            border-radius: 10px;
+            padding: 8px;
+        }
+        
+        /* 标题样式优化 */
+        h1, h2, h3 {
+            color: #000000;
+            font-weight: 600;
+        }
+        
+        h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        
+        h2 {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+        
+        h3 {
+            font-size: 18px;
+            margin-bottom: 4px;
+        }
+        
+        /* 分割线优化 */
+        hr {
+            border: none;
+            height: 1px;
+            background-color: #E5E5EA;
+            margin: 16px 0;
+        }
+        
+        /* iOS风格表格 */
+        .dataframe {
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #E5E5EA;
+        }
+        
+        /* Plotly图表容器 */
+        .js-plotly-plot {
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        /* 移除不必要的边距 */
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        
+        /* 优化展开器样式 */
+        .streamlit-expanderHeader {
+            background-color: #F9F9F9;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+        
+        /* 优化选择框 */
+        [data-baseweb="select"] {
+            border-radius: 10px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
         self.initialize_session_state()
         self.render_sidebar()
         
