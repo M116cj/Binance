@@ -16,6 +16,7 @@ import uuid
 import asyncio
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -33,7 +34,55 @@ from fastapi.responses import Response
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Crypto Surge Prediction API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager - replaces deprecated @app.on_event"""
+    # Startup
+    logger.info("Initializing database...")
+    db_manager.initialize()
+    
+    # 创建默认模型版本（如果不存在）
+    with db_manager.get_session() as db:
+        existing_model = db.query(ModelVersion).filter(ModelVersion.version == "1.0.0").first()
+        if not existing_model:
+            default_model = ModelVersion(
+                version="1.0.0",
+                model_type="lightgbm_demo",
+                is_active=True,
+                config={"demo": True, "focal_gamma": 1.5},
+                metrics={"pr_auc": 0.72, "hit_at_top_k": 0.65},
+                calibration_method="isotonic",
+                calibration_ece=0.04,
+                deployed_at=datetime.utcnow(),
+                deployed_by="system"
+            )
+            db.add(default_model)
+            db.commit()
+            logger.info("Created default model version 1.0.0")
+    
+    # Start background cleanup tasks
+    logger.info("Starting background cleanup tasks...")
+    cleanup_tasks = [
+        asyncio.create_task(start_cache_cleanup_task(global_cache, interval=60.0)),
+        asyncio.create_task(start_rate_limiter_cleanup_task(global_rate_limiter, interval=600.0))
+    ]
+    logger.info("API server startup complete with caching and rate limiting enabled")
+    
+    yield  # Application runs here
+    
+    # Shutdown
+    logger.info("Shutting down background tasks...")
+    for task in cleanup_tasks:
+        task.cancel()
+    logger.info("Shutdown complete")
+
+
+app = FastAPI(
+    title="Crypto Surge Prediction API",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,58 +128,6 @@ async def rate_limit_middleware(request: Request, call_next):
         # Release slot
         await global_rate_limiter.release()
 
-
-# Background cleanup tasks
-_cleanup_tasks = []
-
-
-@app.on_event("startup")
-async def startup_event():
-    """启动时初始化数据库和后台任务"""
-    logger.info("Initializing database...")
-    db_manager.initialize()
-    
-    # 创建默认模型版本（如果不存在）
-    with db_manager.get_session() as db:
-        existing_model = db.query(ModelVersion).filter(ModelVersion.version == "1.0.0").first()
-        if not existing_model:
-            default_model = ModelVersion(
-                version="1.0.0",
-                model_type="lightgbm_demo",
-                is_active=True,
-                config={"demo": True, "focal_gamma": 1.5},
-                metrics={"pr_auc": 0.72, "hit_at_top_k": 0.65},
-                calibration_method="isotonic",
-                calibration_ece=0.04,
-                deployed_at=datetime.utcnow(),
-                deployed_by="system"
-            )
-            db.add(default_model)
-            db.commit()
-            logger.info("Created default model version 1.0.0")
-    
-    # Start background cleanup tasks
-    logger.info("Starting background cleanup tasks...")
-    _cleanup_tasks.append(asyncio.create_task(start_cache_cleanup_task(global_cache, interval=60.0)))
-    _cleanup_tasks.append(asyncio.create_task(start_rate_limiter_cleanup_task(global_rate_limiter, interval=600.0)))
-    logger.info("API server startup complete with caching and rate limiting enabled")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """关闭数据库连接和后台任务"""
-    logger.info("Shutting down background tasks...")
-    for task in _cleanup_tasks:
-        task.cancel()
-    
-    logger.info("Closing database connections...")
-    db_manager.close()
-    
-    # Log final stats
-    cache_stats = global_cache.get_stats()
-    rate_limit_stats = global_rate_limiter.get_stats()
-    logger.info(f"Final cache stats: {cache_stats}")
-    logger.info(f"Final rate limiter stats: {rate_limit_stats}")
 
 def generate_mock_time_series(days: int, start_value: float = 0.0) -> Dict:
     """生成模拟时间序列数据"""
@@ -601,19 +598,28 @@ async def get_signal_history(
     """获取特定交易对的信号历史"""
     cutoff_time = datetime.utcnow() - timedelta(hours=hours)
     
-    signals = db.query(Signal).filter(
+    signals_list: List[Signal] = db.query(Signal).filter(
         Signal.symbol == symbol,
         Signal.created_at >= cutoff_time
     ).order_by(Signal.created_at.asc()).all()
     
     # 计算统计数据
-    total_signals = len(signals)
-    a_tier_count = sum(1 for s in signals if s.tier == 'A')
-    b_tier_count = sum(1 for s in signals if s.tier == 'B')
-    long_count = sum(1 for s in signals if s.decision == 'LONG')
+    total_signals = len(signals_list)
     
-    avg_utility = np.mean([s.net_utility for s in signals]) if signals else 0
-    avg_latency = np.mean([s.sla_latency_ms for s in signals]) if signals else 0
+    if signals_list:
+        a_tier_count = sum(1 for s in signals_list if s.tier == 'A')  # type: ignore
+        b_tier_count = sum(1 for s in signals_list if s.tier == 'B')  # type: ignore
+        long_count = sum(1 for s in signals_list if s.decision == 'LONG')  # type: ignore
+        
+        # Extract values to plain Python lists for numpy
+        utilities = [float(s.net_utility) if s.net_utility is not None else 0.0 for s in signals_list]  # type: ignore
+        latencies = [float(s.sla_latency_ms) if s.sla_latency_ms is not None else 0.0 for s in signals_list]  # type: ignore
+        
+        avg_utility = float(np.mean(utilities))
+        avg_latency = float(np.mean(latencies))
+    else:
+        a_tier_count = b_tier_count = long_count = 0
+        avg_utility = avg_latency = 0.0
     
     return {
         "symbol": symbol,
@@ -623,8 +629,8 @@ async def get_signal_history(
             "a_tier_signals": a_tier_count,
             "b_tier_signals": b_tier_count,
             "long_signals": long_count,
-            "avg_utility": float(avg_utility),
-            "avg_latency_ms": float(avg_latency)
+            "avg_utility": avg_utility,
+            "avg_latency_ms": avg_latency
         },
         "signals": [
             {
@@ -635,7 +641,7 @@ async def get_signal_history(
                 "utility": s.net_utility,
                 "latency_ms": s.sla_latency_ms
             }
-            for s in signals
+            for s in signals_list
         ]
     }
 
