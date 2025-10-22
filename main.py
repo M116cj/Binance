@@ -352,9 +352,13 @@ class CryptoSurgePredictionDashboard:
             """, unsafe_allow_html=True)
     
     def render_realtime_signal_card(self):
-        """报告1：实时信号卡片"""
-        st.markdown("## 📡 实时交易信号")
-        st.caption("当前最新的买卖建议和市场数据")
+        """报告1：实时信号卡片（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: white; margin: 0; font-size: 24px; font-weight: 700;'>📡 实时交易信号</h2>
+            <p style='color: rgba(255,255,255,0.9); margin: 4px 0 0 0; font-size: 14px;'>当前最新的买卖建议和市场数据</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -371,9 +375,13 @@ class CryptoSurgePredictionDashboard:
             st.error("❌ 无法加载实时信号数据，请检查后台服务")
     
     def render_regime_state(self):
-        """报告2：市场状态与流动性"""
-        st.markdown("## 🌊 市场状态分析")
-        st.caption("当前市场的波动性和交易活跃度")
+        """报告2：市场状态与流动性（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: white; margin: 0; font-size: 24px; font-weight: 700;'>🌊 市场状态分析</h2>
+            <p style='color: rgba(255,255,255,0.9); margin: 4px 0 0 0; font-size: 14px;'>当前市场的波动性和交易活跃度</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         params = {'symbol': st.session_state.selected_symbol}
         data = self.fetch_data("reports/regime", params)
@@ -383,9 +391,13 @@ class CryptoSurgePredictionDashboard:
             st.error("❌ 无法加载市场状态数据")
     
     def render_probability_window(self):
-        """报告3：预测概率与时间窗口"""
-        st.markdown("## 📈 涨跌概率分析")
-        st.caption("未来不同时间段的价格上涨可能性")
+        """报告3：预测概率与时间窗口（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: white; margin: 0; font-size: 24px; font-weight: 700;'>📈 涨跌概率分析</h2>
+            <p style='color: rgba(255,255,255,0.9); margin: 4px 0 0 0; font-size: 14px;'>未来不同时间段的价格上涨可能性</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -400,9 +412,13 @@ class CryptoSurgePredictionDashboard:
             st.error("❌ 无法加载概率分析数据")
     
     def render_backtest_performance(self):
-        """报告5：历史回测性能"""
-        st.markdown("## 📊 历史表现回顾")
-        st.caption("过去30天的策略收益和胜率统计")
+        """报告5：历史回测性能（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: white; margin: 0; font-size: 24px; font-weight: 700;'>📊 历史表现回顾</h2>
+            <p style='color: rgba(255,255,255,0.9); margin: 4px 0 0 0; font-size: 14px;'>过去30天的策略收益和胜率统计</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -420,9 +436,13 @@ class CryptoSurgePredictionDashboard:
             st.error("❌ 无法加载历史表现数据")
     
     def render_calibration_analysis(self):
-        """报告6：校准与误差分析"""
-        st.markdown("## 🎯 预测准确度分析")
-        st.caption("系统预测的可靠性和准确性评估")
+        """报告6：校准与误差分析（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: white; margin: 0; font-size: 24px; font-weight: 700;'>🎯 预测准确度分析</h2>
+            <p style='color: rgba(255,255,255,0.9); margin: 4px 0 0 0; font-size: 14px;'>系统预测的可靠性和准确性评估</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -437,9 +457,13 @@ class CryptoSurgePredictionDashboard:
             st.error("❌ 无法加载准确度分析数据")
     
     def render_attribution_comparison(self):
-        """报告7：事件归因与策略对比"""
-        st.markdown("## 🔍 影响因素分析")
-        st.caption("哪些市场指标对预测影响最大")
+        """报告7：事件归因与策略对比（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #30cfd0 0%, #330867 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: white; margin: 0; font-size: 24px; font-weight: 700;'>🔍 影响因素分析</h2>
+            <p style='color: rgba(255,255,255,0.9); margin: 4px 0 0 0; font-size: 14px;'>哪些市场指标对预测影响最大</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         params = {
             'symbol': st.session_state.selected_symbol,
@@ -456,9 +480,13 @@ class CryptoSurgePredictionDashboard:
             st.error("❌ 无法加载影响因素数据")
     
     def render_admin_panel(self):
-        """管理面板：模型管理和系统配置"""
-        st.markdown("## ⚙️ 系统管理")
-        st.caption("模型版本管理和参数配置")
+        """管理面板：模型管理和系统配置（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: #000; margin: 0; font-size: 24px; font-weight: 700;'>⚙️ 系统管理</h2>
+            <p style='color: rgba(0,0,0,0.7); margin: 4px 0 0 0; font-size: 14px;'>模型版本管理和参数配置</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # 获取模型数据
         models_data = self.fetch_data("models")
@@ -470,9 +498,13 @@ class CryptoSurgePredictionDashboard:
         self.admin_panel.render(models_data, signals_stats)
     
     def render_signal_history(self):
-        """信号历史视图：显示过往预测"""
-        st.markdown("## 📜 历史信号记录")
-        st.caption("查看过往所有的交易信号和结果")
+        """信号历史视图：显示过往预测（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: #000; margin: 0; font-size: 24px; font-weight: 700;'>📜 历史信号记录</h2>
+            <p style='color: rgba(0,0,0,0.7); margin: 4px 0 0 0; font-size: 14px;'>查看过往所有的交易信号和结果</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # 从组件获取过滤值
         # 这些值将由组件的render方法设置
@@ -480,9 +512,13 @@ class CryptoSurgePredictionDashboard:
         self.signal_history.render(self.fetch_data)
     
     def render_monitoring_dashboard(self):
-        """监控仪表板：SLA和质量指标"""
-        st.markdown("## 📊 系统监控")
-        st.caption("实时监控系统性能和数据质量")
+        """监控仪表板：SLA和质量指标（iOS风格）"""
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px;'>
+            <h2 style='color: #000; margin: 0; font-size: 24px; font-weight: 700;'>📊 系统监控</h2>
+            <p style='color: rgba(0,0,0,0.7); margin: 4px 0 0 0; font-size: 14px;'>实时监控系统性能和数据质量</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         # 将fetch函数传递给监控仪表板
         self.monitoring_dashboard.render(self.fetch_data)
