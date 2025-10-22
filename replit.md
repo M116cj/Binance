@@ -8,6 +8,33 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### 2025-10-22: 代码重构与架构优化（v2.2）✅ 已完成
+1. **双模式架构基础**:
+   - 创建`backend/services/`统一接口包，支持demo/production模式切换
+   - 在`APISettings`添加mode配置（Literal["demo", "production"]）
+   - 懒加载服务实例，demo模式下不初始化真实推理服务
+   
+2. **前端性能优化**（**80%请求减少**）:
+   - 创建`/reports/batch`端点，聚合5个独立API调用为1个批处理请求
+   - 更新`monitoring_dashboard.py`使用批处理端点
+   - 缓存TTL=10秒，减少网络往返
+   - **优化效果**：5个请求→1个请求，显著降低延迟
+   
+3. **数据契约保证**:
+   - 批处理端点完整匹配原始`/signals/stats`和`/models`契约
+   - 包含by_symbol breakdown、tier counts、avg_utility等完整指标
+   - 保持向后兼容，不破坏现有功能
+   
+4. **代码清理**:
+   - 删除向后兼容字段（tau_conservative等，已稳定2周+）
+   - 简化配置，减少技术债务
+   - LSP诊断清零，类型安全
+   
+5. **架构改进**:
+   - 保留ClickHouse/Redis/ONNX服务为生产模式预留
+   - 为未来真实推理集成提供清晰路径
+   - Architect三轮审查批准（APPROVED）
+
 ### 2025-10-22: 参数全面优化 & 两档模型上线（v2.1）✅ 已完成
 1. **核心参数优化**（性能与速度提升）:
    - **theta扩大**：0.6%→0.8%, 0.4%→0.56%（扩大波动覆盖，提升趋势检测）
