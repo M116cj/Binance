@@ -1,0 +1,68 @@
+name: Update README
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/project_manifest.yaml'
+      - 'docs/README_template.md'
+      - 'scripts/update_readme.py'
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Sundays at 00:00 UTC
+    - cron: '0 0 * * 0'
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml jinja2
+      
+      - name: Generate README
+        run: |
+          python scripts/update_readme.py
+      
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet README.md; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected in README.md"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in README.md"
+          fi
+      
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add README.md
+          git commit -m "docs: auto-update README.md [skip ci]"
+          git push
+      
+      - name: Summary
+        run: |
+          if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
+            echo "✅ README.md has been updated and committed"
+          else
+            echo "ℹ️ No changes to README.md"
+          fi
